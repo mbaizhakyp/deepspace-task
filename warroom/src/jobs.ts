@@ -14,6 +14,7 @@
 import type { Job, JobContext } from 'deepspace/worker'
 import type { Env } from '../worker'
 import { ownerIntegration, roomTools } from './server/room-tools'
+import { writeAudit } from './server/audit'
 import { parseMemberIds } from './actions/rooms'
 
 export const FREE_IMPORT_LIMIT = 3
@@ -33,6 +34,31 @@ type RoomData = {
 }
 
 export async function runJob(job: Job, ctx: JobContext, env: Env): Promise<unknown> {
+  try {
+    const result = await dispatch(job, ctx, env)
+    await writeAudit(env, {
+      kind: 'job',
+      name: job.type,
+      userId: job.enqueuedBy?.replace(/^verified:/, '') ?? '',
+      roomId: (job.payload as { roomId?: string } | undefined)?.roomId,
+      ok: true,
+      detail: { result },
+    })
+    return result
+  } catch (err) {
+    await writeAudit(env, {
+      kind: 'error',
+      name: job.type,
+      userId: job.enqueuedBy?.replace(/^verified:/, '') ?? '',
+      roomId: (job.payload as { roomId?: string } | undefined)?.roomId,
+      ok: false,
+      detail: { thrown: err instanceof Error ? err.message : String(err) },
+    })
+    throw err
+  }
+}
+
+async function dispatch(job: Job, ctx: JobContext, env: Env): Promise<unknown> {
   switch (job.type) {
     case 'import-text':
       return importText(job, ctx, env)

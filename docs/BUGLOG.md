@@ -46,6 +46,22 @@ Hypothesis → Root cause: board-ness was sniffed from the DO's FIRST fetch URL 
 Fix: dropped URL sniffing; the room proves it is a board by its own data — the `board_settings/settings` row exists only in board rooms, and `freezeDenial` already reads it per-mutation. · Verified: the same raw-socket probe is now rejected while frozen and lands after unfreeze (warroom.spec.ts passes; full suite 11/11 + 8 unit).
 Note: this is exactly why the spec drives a mutation past the disabled UI — button-disabling would have hidden this bug through every demo.
 
+## B-005 · Room "duplicated itself" after second-account login · OPEN — awaiting data
+When: user report, 2026-08-31 · Where: lobby (user observation; exact surface unconfirmed)
+Symptom (reported): after logging in from a different account, a room appeared twice.
+Repro attempts (all failed to duplicate): (1) second account joins via link → lobby shows room once; (2) lobby held open during a third user's join (live memberIds update) → no dup; (3) double-click "Open a room" → one room. Prod logs hold no create-room double-fire in the window.
+Mitigations shipped anyway: synchronous ref guard on room creation (same-tick double-submit), and the new audit trail records every create-room/join-room with caller + params — the next occurrence will be diagnosable from /audit instead of guesswork.
+Also found by analysis while investigating (not the reported bug): join-room has a read-modify-write race on memberIds — two users joining in the same instant can drop one member (they re-join on reload; logged as accepted ceiling in the action).
+
+## B-002 · Composio Google Docs: "THAT DOCUMENT CAME BACK EMPTY" · OPEN — diagnostics shipped
+Update (2026-08-31): user hit it live. Prod logs confirm `import-gdoc` ran and answered 200 — the Composio call SUCCEEDED (no requiresConnection, no error), but `extractDocText` found nothing, so either the tool slug returns a different JSON shape than the Google-Docs-API walker expects, or the slug maps to a different tool. The action now returns (and the audit trail records) the response's key-shape — one retry after deploy tells us exactly what to fix.
+
+## D-015 · One audit trail, three writers, platform reporter for the client half
+When: 2026-08-31 (user request: action + error loggers, admin-reviewable)
+Decision: a single admin-read-only `audit` collection in the app scope; written server-side only from two choke points (the action route wraps every action call; runJob wraps every job) — no per-action logging code. Client-side JS errors use the SDK's `installClientErrorReporter` + `registerClientErrorRoute` (land in `deepspace logs` tagged CLIENT) instead of the collection. Minimal internal `/audit` viewer page now; the real admin portal stays future work.
+Why: choke points mean nothing can forget to log; admin-only RBAC means the trail is invisible to users; deep string truncation keeps document content out of it.
+Beats: per-feature log calls (drift), a custom client reporter (the platform ships one), building the portal now (not asked for).
+
 ## D-001 · No video/audio calls
 When: planning
 Decision: presence (avatars + live cursors) carries the "we're together" feeling; no LiveKit.

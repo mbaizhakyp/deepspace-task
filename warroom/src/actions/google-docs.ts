@@ -67,9 +67,23 @@ export const importGoogleDoc: ActionHandler<Env> = async ({ userId, params, tool
   }
 
   const text = extractDocText(payload.data)
-  if (!text.trim()) return { success: false, error: 'that document came back empty' }
+  if (!text.trim()) {
+    // B-002 diagnostics: return the envelope's SHAPE (keys only, no content)
+    // so the audit trail captures what Composio actually sent back and the
+    // extractor / tool slug can be corrected from data instead of guesses.
+    return { success: false, error: `that document came back empty (shape: ${shapeOf(payload)})` }
+  }
 
   return checkQuotaAndEnqueue(t, env, callerJwt, { userId, roomId, text, mode, userName })
+}
+
+/** Key structure of a response, two levels deep, values elided. */
+export function shapeOf(v: unknown, depth = 0): string {
+  if (!v || typeof v !== 'object') return typeof v
+  if (Array.isArray(v)) return `[${v.length}]`
+  const keys = Object.keys(v).slice(0, 12)
+  if (depth >= 2) return `{${keys.join(',')}}`
+  return `{${keys.map((k) => `${k}:${shapeOf((v as Record<string, unknown>)[k], depth + 1)}`).join(',')}}`
 }
 
 export function extractDocId(url: string): string | null {

@@ -15,6 +15,7 @@ import {
   MSG,
   PresenceRoom,
   RecordRoom,
+  registerClientErrorRoute,
   resolveAppRole,
   YjsRoom,
 } from 'deepspace/worker'
@@ -186,6 +187,9 @@ app.use('*', async (c, next) => {
 // Registration order is part of the worker contract. The wildcard auth route
 // follows its special cases, AI precedes platform proxies, and static is last.
 registerAuthAndIntegrationRoutes(app)
+// Client-side JS errors POST here and land in `deepspace logs` tagged CLIENT.
+// Must precede the /_deepspace/* platform proxy so the specific route wins.
+registerClientErrorRoute(app)
 registerRealtimeRoutes(app)
 registerActionRoutes(app, resolveAuth)
 // The in-app assistant stores chat history in `ai-chats` / `ai-messages`,

@@ -4,7 +4,7 @@
  * include the caller. Creation goes through the create-room action.
  */
 
-import { useState } from 'react'
+import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
 import { useAuthUser, useQuery } from 'deepspace'
 import { Button, Input, useToast } from '@/components/ui'
@@ -17,17 +17,22 @@ export default function RoomsPage() {
   const { records: rooms, status } = useQuery<Room>('rooms', { orderBy: 'createdAt', orderDir: 'desc' })
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
+  const createGuard = useRef(false)
   const navigate = useNavigate()
   const { error } = useToast()
 
   async function create() {
-    if (!name.trim() || creating) return
+    // ref guard: two clicks (or Enter+click) in the same tick both see the
+    // stale `creating` state — the ref flips synchronously (B-005 defense)
+    if (!name.trim() || creating || createGuard.current) return
+    createGuard.current = true
     setCreating(true)
     const res = await callAction<{ roomId: string }>('create-room', {
       name,
       userName: user?.fullName ?? user?.primaryEmailAddress?.emailAddress ?? 'facilitator',
     })
     setCreating(false)
+    createGuard.current = false
     if (res.success && res.data?.roomId) navigate(`/room/${res.data.roomId}`)
     else error('Could not open the room', res.error)
   }

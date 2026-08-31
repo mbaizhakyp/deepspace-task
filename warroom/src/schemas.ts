@@ -15,13 +15,15 @@ import type { CollectionSchema } from 'deepspace/schema'
 import { usersSchema } from './schemas/users-schema'
 import { settingsSchema } from './schemas/admin-schema'
 import { roomsSchema } from './schemas/rooms-schema'
+import { auditSchema } from './schemas/audit-schema'
 import { boardCollectionSchemas } from './schemas/board-schemas'
 
-/** App scope: lobby + auth. */
+/** App scope: lobby + auth + admin audit trail. */
 export const appSchemas: CollectionSchema[] = [
   usersSchema,
   settingsSchema,
   roomsSchema,
+  auditSchema,
 ]
 
 /** Board scope: one room per board. Users registers presence identity there too. */
@@ -34,5 +36,6 @@ export const schemas: CollectionSchema[] = [
   usersSchema,
   settingsSchema,
   roomsSchema,
+  auditSchema,
   ...boardCollectionSchemas,
 ]

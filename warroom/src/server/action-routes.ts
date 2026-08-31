@@ -32,6 +32,7 @@ import { apiWorkerFetch } from 'deepspace/worker'
 import type { ActionResult, ActionTools, VerifyResult } from 'deepspace/worker'
 import { actions } from '../actions/index.js'
 import { integrations } from '../integrations.js'
+import { writeAudit } from './audit.js'
 import type { AppContext, Env } from '../../worker.js'
 
 type ResolveAuth = (req: Request, env: Env) => Promise<VerifyResult | null>
@@ -57,8 +58,35 @@ export function registerActionRoutes(app: Hono<AppContext>, resolveAuth: Resolve
     if (!action) return c.json({ error: 'Action not found' }, 404)
     const params = await c.req.json<Record<string, unknown>>()
     const tools = createActionTools(c.env, auth.userId, callerJwt)
-    const result = await action({ userId: auth.userId, params, tools, env: c.env, callerJwt })
-    return c.json(result as unknown as Record<string, unknown>)
+
+    // Audit choke point: every action call — who, what, outcome — lands in the
+    // app-scope audit collection (admin-only read; future admin portal reads it).
+    // Fire-and-forget via waitUntil so logging never adds latency or failures.
+    const audit = (ok: boolean, detail: unknown) =>
+      c.executionCtx.waitUntil(
+        writeAudit(c.env, {
+          kind: ok ? 'action' : 'error',
+          name,
+          userId: auth.userId,
+          userName: typeof params.userName === 'string' ? params.userName : undefined,
+          roomId: typeof params.roomId === 'string' ? params.roomId : undefined,
+          ok,
+          detail,
+        }),
+      )
+
+    try {
+      const result = await action({ userId: auth.userId, params, tools, env: c.env, callerJwt })
+      const failed = !!result && typeof result === 'object' && (result as { success?: boolean }).success === false
+      audit(!failed, {
+        params,
+        ...(failed ? { error: (result as { error?: string }).error } : {}),
+      })
+      return c.json(result as unknown as Record<string, unknown>)
+    } catch (err) {
+      audit(false, { params, thrown: err instanceof Error ? err.message : String(err) })
+      throw err
+    }
   })
 }
 
