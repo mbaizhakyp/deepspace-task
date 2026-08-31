@@ -46,12 +46,14 @@ Hypothesis → Root cause: board-ness was sniffed from the DO's FIRST fetch URL 
 Fix: dropped URL sniffing; the room proves it is a board by its own data — the `board_settings/settings` row exists only in board rooms, and `freezeDenial` already reads it per-mutation. · Verified: the same raw-socket probe is now rejected while frozen and lands after unfreeze (warroom.spec.ts passes; full suite 11/11 + 8 unit).
 Note: this is exactly why the spec drives a mutation past the disabled UI — button-disabling would have hidden this bug through every demo.
 
-## B-005 · Room "duplicated itself" after second-account login · OPEN — awaiting data
-When: user report, 2026-08-31 · Where: lobby (user observation; exact surface unconfirmed)
-Symptom (reported): after logging in from a different account, a room appeared twice.
-Repro attempts (all failed to duplicate): (1) second account joins via link → lobby shows room once; (2) lobby held open during a third user's join (live memberIds update) → no dup; (3) double-click "Open a room" → one room. Prod logs hold no create-room double-fire in the window.
-Mitigations shipped anyway: synchronous ref guard on room creation (same-tick double-submit), and the new audit trail records every create-room/join-room with caller + params — the next occurrence will be diagnosable from /audit instead of guesswork.
-Also found by analysis while investigating (not the reported bug): join-room has a read-modify-write race on memberIds — two users joining in the same instant can drop one member (they re-join on reload; logged as accepted ceiling in the action).
+## B-005 · Room "duplicated itself" after second-account login · FIXED (was never a duplicate)
+When: user report, 2026-08-31 · Where: lobby
+Symptom (reported): after logging in from a different account, "Q3 Launch Plan" appeared twice in the lobby (user screenshots: gmail account shows two identical MEMBER rows; .job account shows one FACILITATOR row).
+Repro attempts that ruled out data duplication: (1) second account joins via link → one row; (2) lobby held open during a live memberIds update → no dup; (3) double-click "Open a room" → one room.
+Root cause: **two distinct room records legitimately share the name "Q3 Launch Plan"** — the seeded demo room (facilitator: test account Alice, verified by probing Alice's lobby: exactly one row) and a second room the .job account created itself. The gmail account joined BOTH via links, and the lobby rendered rooms as name + own-role only — zero disambiguation, so two different rooms read as one duplicated one. A UI defect, compounded by the demo room using the most obvious name a real user would also pick.
+Fix: lobby rows now carry `<FACILITATOR>'S ROOM · <date opened>` (facilitator name resolved from the app roster's public identity — no schema change), so same-named rooms are tellable apart. · Verified: type-checked + suite green; the two rows will now read "ALICE'S ROOM · AUG 30" vs "YOUR ROOM · AUG 31" style labels.
+Defense shipped earlier stays: create double-submit ref guard; audit trail records every create/join.
+Related accepted ceiling: join-room read-modify-write race on memberIds can drop one of two same-instant joiners (self-heals on reload).
 
 ## B-002 · Composio Google Docs: "THAT DOCUMENT CAME BACK EMPTY" · OPEN — diagnostics shipped
 Update (2026-08-31): user hit it live. Prod logs confirm `import-gdoc` ran and answered 200 — the Composio call SUCCEEDED (no requiresConnection, no error), but `extractDocText` found nothing, so either the tool slug returns a different JSON shape than the Google-Docs-API walker expects, or the slug maps to a different tool. The action now returns (and the audit trail records) the response's key-shape — one retry after deploy tells us exactly what to fix.

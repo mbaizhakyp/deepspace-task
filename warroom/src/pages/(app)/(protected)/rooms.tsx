@@ -6,7 +6,7 @@
 
 import { useRef, useState } from 'react'
 import { useNavigate } from 'react-router-dom'
-import { useAuthUser, useQuery } from 'deepspace'
+import { useAuthUser, useQuery, useUsers } from 'deepspace'
 import { Button, Input, useToast } from '@/components/ui'
 import { callAction } from '../../../lib/actions-client'
 
@@ -15,6 +15,9 @@ type Room = { name: string; facilitatorId: string; memberIds?: unknown }
 export default function RoomsPage() {
   const { user } = useAuthUser()
   const { records: rooms, status } = useQuery<Room>('rooms', { orderBy: 'createdAt', orderDir: 'desc' })
+  // roster (public identity) — lets rows say WHOSE room it is; two rooms may
+  // legitimately share a name (B-005), so name alone must never be the label
+  const { users: roster } = useUsers()
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
   const createGuard = useRef(false)
@@ -70,6 +73,12 @@ export default function RoomsPage() {
         )}
         {rooms.map((r) => {
           const mine = r.data.facilitatorId === user?.id
+          const facilitatorName = roster.find((u) => u.id === r.data.facilitatorId)?.name
+          const whose = mine ? 'YOUR ROOM' : `${(facilitatorName ?? 'UNKNOWN').toUpperCase()}'S ROOM`
+          const opened = new Date(r.createdAt).toLocaleDateString(undefined, {
+            month: 'short',
+            day: 'numeric',
+          })
           return (
             <div
               key={r.recordId}
@@ -77,9 +86,14 @@ export default function RoomsPage() {
             >
               <button
                 onClick={() => navigate(`/room/${r.recordId}`)}
-                className="flex flex-1 items-baseline justify-between text-left"
+                className="flex flex-1 items-baseline justify-between gap-4 text-left"
               >
-                <span className="font-serif text-xl text-foreground">{r.data.name}</span>
+                <span className="flex items-baseline gap-3">
+                  <span className="font-serif text-xl text-foreground">{r.data.name}</span>
+                  <span className="wire text-[10px] text-chrome/70">
+                    {whose} · {opened.toUpperCase()}
+                  </span>
+                </span>
                 <span className="wire text-chrome">{mine ? 'FACILITATOR' : 'MEMBER'}</span>
               </button>
               {mine && (
