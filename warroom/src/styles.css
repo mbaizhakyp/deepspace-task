@@ -17,27 +17,42 @@
  * they stay consistent across every preset.
  */
 @theme {
-  /* shadcn core tokens — slate (default): neutral gray on near-black, indigo accent */
-  --color-background: #0a0a0a;
-  --color-foreground: #e8eaed;
-  --color-card: #161616;
-  --color-card-foreground: #e8eaed;
-  --color-popover: #161616;
-  --color-popover-foreground: #e8eaed;
-  --color-primary: #818cf8;
-  --color-primary-foreground: #ffffff;
-  --color-secondary: #1e1e1e;
-  --color-secondary-foreground: #e8eaed;
-  --color-muted: #1e1e1e;
-  --color-muted-foreground: #9ca3af;
-  --color-accent: #262626;
-  --color-accent-foreground: #e8eaed;
-  --color-destructive: #ef4444;
+  /* Warroom — "newsroom wire terminal" (design-brief.md).
+   * Chrome (the room) is dark ops-green; artifacts (cards) are warm paper;
+   * one orange accent; phosphor green means "live". */
+  --color-background: #101210;
+  --color-foreground: #e6eae4;
+  --color-card: #191c19;
+  --color-card-foreground: #e6eae4;
+  --color-popover: #191c19;
+  --color-popover-foreground: #e6eae4;
+  --color-primary: #e8641b;
+  --color-primary-foreground: #101210; /* dark ink on orange, always */
+  --color-secondary: #191c19;
+  --color-secondary-foreground: #e6eae4;
+  --color-muted: #191c19;
+  --color-muted-foreground: #9ba59b;
+  --color-accent: #23271f;
+  --color-accent-foreground: #e6eae4;
+  --color-destructive: #e5484d;
   --color-destructive-foreground: #ffffff;
-  --color-border: rgba(60, 64, 67, 0.6);
-  --color-input: rgba(60, 64, 67, 0.6);
-  --color-ring: #818cf8;
-  --radius: 0.5rem;
+  --color-border: #2a2e2a;
+  --color-input: #2a2e2a;
+  --color-ring: #e8641b;
+  --radius: 0.25rem;
+
+  /* Artifact (paper) + signal tokens */
+  --color-paper: #f4f1e8;
+  --color-ink: #1a1a16;
+  --color-ink-muted: #6e6a5e;
+  --color-chrome: #9ba59b;
+  --color-live: #4ade80;
+  --color-signal: #e8641b;
+  --color-warnamber: #e8a33d;
+
+  --font-serif: 'Instrument Serif', 'Lora', Georgia, serif;
+  --font-mono: 'IBM Plex Mono', ui-monospace, monospace;
+  --font-sans: 'Inter', ui-sans-serif, system-ui, sans-serif;
 
   /*
    * Map the rounded-* utilities onto --radius so a theme (or you) can change
@@ -164,7 +179,7 @@
   }
 
   body {
-    font-family: 'SF Pro Text', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+    font-family: var(--font-sans);
     line-height: 1.5;
     -webkit-font-smoothing: antialiased;
     -moz-osx-font-smoothing: grayscale;
@@ -232,3 +247,47 @@
     touch-action: manipulation;
   }
 }
+
+/* ── Warroom board utilities ─────────────────────────────────────────── */
+
+/* Drafting-table dot grid for the board ground */
+.dotgrid {
+  background-image: radial-gradient(var(--color-border) 1px, transparent 1px);
+  background-size: 24px 24px;
+}
+
+/* System voice: mono, uppercase, tracked (design-brief typography) */
+.wire {
+  font-family: var(--font-mono);
+  font-size: 11px;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+@keyframes card-drop {
+  from { transform: translateY(-10px) rotate(-1.2deg); opacity: 0; }
+  to { opacity: 1; }
+}
+.card-drop { animation: card-drop 0.35s ease-out both; }
+
+@keyframes breathe {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
+}
+.breathe { animation: breathe 3s ease-in-out infinite; }
+
+@keyframes wire-tick {
+  from { opacity: 0; transform: translateY(4px); }
+  to { opacity: 1; transform: none; }
+}
+.wire-tick { animation: wire-tick 0.3s ease-out both; }
+
+@keyframes fillbar { from { width: 0; } }
+.fillbar { animation: fillbar 0.7s cubic-bezier(0.3, 1.3, 0.5, 1) both; }
+
+@keyframes locked-shake {
+  0%, 100% { transform: translate(0, 0); }
+  25% { transform: translate(-3px, 0); }
+  75% { transform: translate(3px, 0); }
+}
+.locked-shake { animation: locked-shake 0.3s ease-in-out; }

@@ -62,8 +62,19 @@ export function registerActionRoutes(app: Hono<AppContext>, resolveAuth: Resolve
   })
 }
 
-function createActionTools(env: Env, userId: string, callerJwt: string): ActionTools {
-  const stub = env.RECORD_ROOMS.get(env.RECORD_ROOMS.idFromName(`app:${env.DEEPSPACE_APP_ID}`))
+/**
+ * ActionTools plus `forRoom(roomId)` — the same privileged tools bound to
+ * another record room (a `board:<id>` room). Warroom actions use it to write
+ * board_settings/cards into board rooms; the RBAC-off trust model above
+ * applies there identically, so actions must authorize against memberIds
+ * themselves before touching a board.
+ */
+export type AppActionTools = ActionTools & { forRoom: (roomId: string) => AppActionTools }
+
+function createActionTools(env: Env, userId: string, callerJwt: string, roomName?: string): AppActionTools {
+  const stub = env.RECORD_ROOMS.get(
+    env.RECORD_ROOMS.idFromName(roomName ?? `app:${env.DEEPSPACE_APP_ID}`),
+  )
 
   // The DO returns ActionResult<unknown>; callers below supply the precise
   // operation result type fixed by the SDK tools-api wire contract.
@@ -116,5 +127,6 @@ function createActionTools(env: Env, userId: string, callerJwt: string): ActionT
     query: (collection, options) => execTool('records.query', { collection, ...options }),
     integration: callIntegration,
     registerUser: (options) => execTool('users.register', { ...options }),
+    forRoom: (roomId: string) => createActionTools(env, userId, callerJwt, roomId),
   }
 }
