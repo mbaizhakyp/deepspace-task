@@ -55,11 +55,12 @@ export default function RoomPage() {
     }
   }, [id, user?.id])
 
-  const { records: rooms } = useQuery<Room>('rooms', {})
+  const { records: rooms, status: roomsStatus } = useQuery<Room>('rooms', {})
   const room = rooms.find((r) => r.recordId === id)
 
   if (!id) return null
-  if (joinState === 'failed') {
+  // joined fine but the record is gone (or vanishes live) → the room was deleted
+  if (joinState === 'failed' || (joinState === 'ok' && roomsStatus === 'ready' && !room)) {
     return (
       <div className="flex h-full flex-col items-center justify-center gap-3">
         <div className="wire text-chrome">ROOM NOT FOUND</div>

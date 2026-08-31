@@ -37,6 +37,13 @@ export default function RoomsPage() {
     else error('Could not open the room', res.error)
   }
 
+  async function deleteRoom(roomId: string, roomName: string) {
+    // native confirm: destructive, one line, no dialog plumbing
+    if (!window.confirm(`Delete "${roomName}"? The board, its polls, and its history go with it.`)) return
+    const res = await callAction('delete-room', { roomId })
+    if (!res.success) error('Could not delete the room', res.error)
+  }
+
   return (
     <div className="mx-auto max-w-3xl px-6 py-12">
       <div className="wire text-chrome">LOBBY</div>
@@ -61,18 +68,32 @@ export default function RoomsPage() {
             Nothing here yet. Open a room, or ask someone for their room link.
           </p>
         )}
-        {rooms.map((r) => (
-          <button
-            key={r.recordId}
-            onClick={() => navigate(`/room/${r.recordId}`)}
-            className="flex items-baseline justify-between rounded-sm border border-border bg-card px-5 py-4 text-left hover:border-chrome"
-          >
-            <span className="font-serif text-xl text-foreground">{r.data.name}</span>
-            <span className="wire text-chrome">
-              {r.data.facilitatorId === user?.id ? 'FACILITATOR' : 'MEMBER'}
-            </span>
-          </button>
-        ))}
+        {rooms.map((r) => {
+          const mine = r.data.facilitatorId === user?.id
+          return (
+            <div
+              key={r.recordId}
+              className="group flex items-baseline gap-4 rounded-sm border border-border bg-card px-5 py-4 hover:border-chrome"
+            >
+              <button
+                onClick={() => navigate(`/room/${r.recordId}`)}
+                className="flex flex-1 items-baseline justify-between text-left"
+              >
+                <span className="font-serif text-xl text-foreground">{r.data.name}</span>
+                <span className="wire text-chrome">{mine ? 'FACILITATOR' : 'MEMBER'}</span>
+              </button>
+              {mine && (
+                <button
+                  onClick={() => deleteRoom(r.recordId, r.data.name)}
+                  className="wire hidden text-chrome hover:text-destructive group-hover:inline"
+                  aria-label={`Delete ${r.data.name}`}
+                >
+                  DELETE
+                </button>
+              )}
+            </div>
+          )
+        })}
       </div>
     </div>
   )

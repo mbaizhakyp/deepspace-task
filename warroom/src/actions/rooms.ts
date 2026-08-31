@@ -85,6 +85,30 @@ export const joinRoom: ActionHandler<Env> = async ({ userId, params, tools }) =>
   return { success: true, data: { roomId } }
 }
 
+export const deleteRoom: ActionHandler<Env> = async ({ userId, params, tools }) => {
+  const t = tools as AppActionTools
+  const roomId = typeof params.roomId === 'string' ? params.roomId : ''
+  if (!roomId) return { success: false, error: 'roomId required' }
+
+  const room = await getRoom(t, roomId)
+  if (!room) return { success: false, error: 'room not found' }
+  if (room.data.facilitatorId !== userId) {
+    return { success: false, error: 'only the facilitator can delete the room' }
+  }
+
+  // Drain the board room's collections, then drop the registry record.
+  // ponytail: query+remove loop, one page per collection — boards cap out at
+  // ~100 cards; switch to a paged drain if rooms ever grow past that.
+  const board = t.forRoom(`board:${roomId}`)
+  for (const collection of ['cards', 'polls', 'votes', 'events', 'board_settings']) {
+    const res = await board.query(collection, { limit: 500 })
+    const records = res.success ? (res.data?.records ?? []) : []
+    for (const r of records) await board.remove(collection, r.recordId)
+  }
+  await t.remove('rooms', roomId)
+  return { success: true, data: { deleted: roomId } }
+}
+
 export const setFreeze: ActionHandler<Env> = async ({ userId, params, tools }) => {
   const t = tools as AppActionTools
   const roomId = typeof params.roomId === 'string' ? params.roomId : ''
