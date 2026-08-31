@@ -21,7 +21,7 @@ export type AuditEntry = {
 export async function writeAudit(env: Env, entry: AuditEntry): Promise<void> {
   try {
     const app = roomTools(env, `app:${env.DEEPSPACE_APP_ID}`, env.OWNER_USER_ID)
-    await app.create('audit', {
+    const res = await app.create('audit', {
       at: Date.now(),
       kind: entry.kind,
       name: entry.name.slice(0, 80),
@@ -31,6 +31,9 @@ export async function writeAudit(env: Env, entry: AuditEntry): Promise<void> {
       ok: entry.ok === false ? 0 : 1,
       detail: serializeDetail(entry.detail),
     })
+    if (!res.success) {
+      console.error(`[audit] create rejected for ${entry.kind}:${entry.name}: ${res.error}`)
+    }
   } catch (err) {
     // last resort: at least reach `deepspace logs`
     console.error(`[audit] write failed for ${entry.kind}:${entry.name}:`, err)
