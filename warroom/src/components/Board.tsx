@@ -5,10 +5,11 @@
  * the UI here only mirrors it.
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useRef, useState } from 'react'
 import { getUserColor, useAuthUser, useMutations, usePresenceRoom, useQuery } from 'deepspace'
-import { Button, Textarea, useToast } from '@/components/ui'
+import { Button, Input, Modal, Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
+import { PollCard, type PollData } from './PollCard'
 
 export type CardData = {
   title: string
@@ -37,7 +38,11 @@ export default function Board({
   const { records: cards } = useQuery<CardData>('cards', {})
   const { records: settingsRecords } = useQuery<SettingsData>('board_settings', {})
   const { records: events } = useQuery<EventData>('events', { orderBy: 'at', orderDir: 'desc', limit: 5 })
+  const { records: polls } = useQuery<PollData>('polls', {})
   const { create, put, remove, ready } = useMutations<CardData>('cards')
+  const pollMutations = useMutations<PollData>('polls')
+  const eventMutations = useMutations<EventData>('events')
+  const [pollDialogOpen, setPollDialogOpen] = useState(false)
   const { warning } = useToast()
 
   const settings = settingsRecords[0]?.data
@@ -59,12 +64,12 @@ export default function Board({
     updateState({ cx: e.clientX - rect.left, cy: e.clientY - rect.top, name: user?.fullName ?? '?' })
   }
 
-  // ── drag ────────────────────────────────────────────────────────────
-  const [drag, setDrag] = useState<{ id: string; dx: number; dy: number; x: number; y: number } | null>(null)
+  // ── drag (cards and polls share it; kind picks the collection) ──────
+  const [drag, setDrag] = useState<{ id: string; kind: 'card' | 'poll'; dx: number; dy: number; x: number; y: number } | null>(null)
   const [shakeId, setShakeId] = useState<string | null>(null)
   const lastDragSync = useRef(0)
 
-  function startDrag(e: React.PointerEvent, id: string, x: number, y: number) {
+  function startDrag(e: React.PointerEvent, id: string, kind: 'card' | 'poll', x: number, y: number) {
     if (locked) {
       setShakeId(id)
       setTimeout(() => setShakeId(null), 350)
@@ -73,7 +78,12 @@ export default function Board({
     }
     const rect = fieldRef.current?.getBoundingClientRect()
     if (!rect) return
-    setDrag({ id, dx: e.clientX - rect.left - x, dy: e.clientY - rect.top - y, x, y })
+    setDrag({ id, kind, dx: e.clientX - rect.left - x, dy: e.clientY - rect.top - y, x, y })
+  }
+
+  function syncDragPosition(id: string, kind: 'card' | 'poll', x: number, y: number) {
+    if (kind === 'card') void put(id, { x, y } as Partial<CardData>)
+    else void pollMutations.put(id, { x, y })
   }
 
   function onDragMove(e: React.PointerEvent) {
@@ -88,12 +98,12 @@ export default function Board({
     const now = performance.now()
     if (now - lastDragSync.current > 120) {
       lastDragSync.current = now
-      void put(drag.id, { x, y } as Partial<CardData>)
+      syncDragPosition(drag.id, drag.kind, x, y)
     }
   }
 
   function endDrag() {
-    if (drag) void put(drag.id, { x: drag.x, y: drag.y } as Partial<CardData>)
+    if (drag) syncDragPosition(drag.id, drag.kind, drag.x, drag.y)
     setDrag(null)
   }
 
@@ -152,10 +162,35 @@ export default function Board({
             {frozen ? 'UNFREEZE' : 'FREEZE'}
           </button>
         )}
+        <button
+          onClick={() => setPollDialogOpen(true)}
+          disabled={!pollMutations.ready || locked}
+          className="wire rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-50"
+        >
+          NEW POLL
+        </button>
         <Button size="sm" onClick={addCard} disabled={!ready || locked}>
           Add card
         </Button>
       </div>
+
+      {pollDialogOpen && (
+        <NewPollDialog
+          onClose={() => setPollDialogOpen(false)}
+          onCreate={async (question, options) => {
+            await pollMutations.create({
+              question,
+              options,
+              status: 'open',
+              x: 380 + Math.random() * 200,
+              y: 120 + Math.random() * 150,
+              authorName: user?.fullName ?? '',
+            })
+            await eventMutations.create({ at: Date.now(), text: `POLL OPENED · ${question.toUpperCase().slice(0, 40)}` })
+            setPollDialogOpen(false)
+          }}
+        />
+      )}
 
       {/* board field */}
       <div
@@ -174,9 +209,23 @@ export default function Board({
             shake={shakeId === c.recordId}
             locked={locked}
             canDelete={!locked && ready}
-            onPointerDown={(e) => startDrag(e, c.recordId, c.data.x, c.data.y)}
+            onPointerDown={(e) => startDrag(e, c.recordId, 'card', c.data.x, c.data.y)}
             onSave={(patch) => put(c.recordId, patch as Partial<CardData>)}
             onDelete={() => remove(c.recordId)}
+          />
+        ))}
+
+        {polls.map((p) => (
+          <PollCard
+            key={p.recordId}
+            pollId={p.recordId}
+            data={p.data}
+            isFacilitator={isFacilitator}
+            locked={locked}
+            dragPos={drag?.kind === 'poll' && drag.id === p.recordId ? { x: drag.x, y: drag.y } : null}
+            onPointerDown={(e) =>
+              startDrag(e, p.recordId, 'poll', p.data.x ?? 400, p.data.y ?? 200)
+            }
           />
         ))}
 
@@ -314,6 +363,59 @@ function BoardCard({
           ×
         </button>
       )}
+    </div>
+  )
+}
+
+function NewPollDialog({
+  onClose,
+  onCreate,
+}: {
+  onClose: () => void
+  onCreate: (question: string, options: string[]) => Promise<void>
+}) {
+  const [question, setQuestion] = useState('')
+  const [optionsText, setOptionsText] = useState('')
+  const options = optionsText
+    .split('\n')
+    .map((s) => s.trim())
+    .filter(Boolean)
+    .slice(0, 4)
+  const valid = question.trim().length > 0 && options.length >= 2
+
+  return (
+    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/50" onClick={onClose}>
+      <div
+        className="w-96 rounded-sm bg-paper p-6 shadow-[0_8px_30px_rgba(0,0,0,.5)]"
+        onClick={(e) => e.stopPropagation()}
+      >
+        <div className="wire text-[10px] text-ink-muted">NEW POLL</div>
+        <input
+          autoFocus
+          value={question}
+          onChange={(e) => setQuestion(e.target.value)}
+          placeholder="What are we deciding?"
+          className="mt-2 w-full border-none bg-transparent font-serif text-2xl text-ink outline-none placeholder:text-ink-muted/60"
+        />
+        <textarea
+          value={optionsText}
+          onChange={(e) => setOptionsText(e.target.value)}
+          placeholder={'One option per line (2–4)\nHold Oct 20\nSlip to Oct 27'}
+          className="mt-3 min-h-24 w-full resize-none rounded-sm border border-ink/15 bg-transparent p-2.5 text-[13px] text-ink outline-none placeholder:text-ink-muted/60"
+        />
+        <div className="mt-4 flex items-center justify-end gap-3">
+          <button onClick={onClose} className="wire text-ink-muted hover:text-ink">
+            CANCEL
+          </button>
+          <button
+            onClick={() => valid && void onCreate(question.trim(), options)}
+            disabled={!valid}
+            className="rounded-sm bg-signal px-4 py-2 text-[13px] font-semibold text-ink disabled:opacity-40"
+          >
+            Open the poll
+          </button>
+        </div>
+      </div>
     </div>
   )
 }
