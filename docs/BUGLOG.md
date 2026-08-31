@@ -58,6 +58,36 @@ Decision: frozen members cannot vote; voting requires editor role.
 Why: one rule is explainable and provable in the live session; per-collection freeze exceptions invite matrix bugs.
 Beats: "frozen can still vote" — plausible product choice, but doubles the permission states to test in the timebox.
 
+## D-008 · Freeze enforcement = webSocketMessage interception in AppRecordRoom (supersedes D-003's mechanism)
+When: stage 1 (SDK research)
+Decision: freeze is enforced by overriding `webSocketMessage` in our `AppRecordRoom`: when the board's settings record says frozen and the sender is not the facilitator, `core.put`/`core.delete` messages are answered with `core.error` and dropped. D-003's role-flip is dead.
+Why: `RecordRoom` (deepspace 0.28.2) exposes no `authorizeWrite` hook (JobRoom has one; RecordRoom doesn't — verified in `dist/worker.d.ts`), and per-room role rows may be cached in the connection attachment at connect time, so a role flip might not bite until reconnect. Message interception is deterministic and evaluated per mutation. Taskspace ships the same pattern (USER_LIST interception), so it's SDK-sanctioned.
+Beats: role flip (uncertain propagation), client-only disable (rubric fail).
+
+## D-009 · Board access gated at the WS route from the app-scope room record
+When: stage 1 (SDK research)
+Decision: `/ws/:roomId` for `board:*` rooms gets a membership check in the worker (mirroring the scaffold's own `resolveDocsYjsRole` pattern): load the room record from app scope, 403 unless caller is in `MemberIds`. Lobby read isolation via `read: 'collaborator'` + `collaboratorsField: 'MemberIds'` on the rooms collection.
+Why: by default ANY authenticated user may connect to any record room — per-board rooms are not access-isolated unless the worker gates them. The scaffold demonstrates exactly this pattern for Yjs docs.
+Beats: 'team' permission + members collection per room — more moving parts, and it still wouldn't stop the initial connection.
+
+## D-010 · Import uses the platform JobRoom, not a hand-rolled jobs collection
+When: stage 1 (SDK research)
+Decision: import runs as an `AppJobRoom` job (`enqueueJob` from the action, `ctx.progress()` streaming, `useJobs('board:<id>')` client-side). PLAN Task 6's `jobs` collection is dropped.
+Why: the scaffold ships a durable job runner with real-time progress over WS — exactly the rubric's "platform primitives instead of reimplementing".
+Beats: progress-record polling (reinvention, worse UX).
+
+## D-011 · Composio confirmed for Google Docs (native google/* can't do it)
+When: stage 1 (docs research)
+Decision: Docs import goes through `composio/*` per-user OAuth as planned; the native `google/*` integration stays unused for now.
+Why: `/guides/google-oauth.md` lists only Gmail/Calendar/Drive-list/Contacts endpoints — no Docs content fetch/export.
+Beats: nothing — it's the only road; recorded so we don't relitigate it mid-build.
+
+## D-012 · No `members` collection in board rooms
+When: stage 1 (SDK research)
+Decision: membership's source of truth is `MemberIds` (json) on the app-scope room record; the board room's auto-registered users table is the display roster.
+Why: one source of truth for both the WS gate (D-009) and the lobby query; a separate members collection would be a second copy to keep in sync.
+Beats: per-room members records (drift risk, more schema).
+
 ## D-007 · Per-board record rooms (`board:<id>`), registry in app scope
 When: planning
 Decision: each board is its own DO room with its own members/cards/polls; app scope holds only the rooms registry + users.
