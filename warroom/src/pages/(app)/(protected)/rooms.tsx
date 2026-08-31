@@ -55,9 +55,18 @@ export default function RoomsPage() {
     if (id) navigate(`/room/${id}`)
   }
 
-  async function deleteRoom(roomId: string, roomName: string) {
-    // native confirm: destructive, one line, no dialog plumbing
-    if (!window.confirm(`Delete "${roomName}"? The board, its polls, and its history go with it.`)) return
+  // No popups (user preference): destructive room delete uses an inline
+  // two-step — first click arms the button ("SURE?"), second click deletes,
+  // and it disarms itself after a beat.
+  const [armedDelete, setArmedDelete] = useState<string | null>(null)
+
+  async function deleteRoom(roomId: string) {
+    if (armedDelete !== roomId) {
+      setArmedDelete(roomId)
+      setTimeout(() => setArmedDelete((cur) => (cur === roomId ? null : cur)), 2500)
+      return
+    }
+    setArmedDelete(null)
     const res = await callAction('delete-room', { roomId })
     if (!res.success) error('Could not delete the room', res.error)
   }
@@ -130,11 +139,15 @@ export default function RoomsPage() {
               </button>
               {mine && (
                 <button
-                  onClick={() => deleteRoom(r.recordId, r.data.name)}
-                  className="wire hidden text-chrome hover:text-destructive group-hover:inline"
+                  onClick={() => deleteRoom(r.recordId)}
+                  className={`wire group-hover:inline ${
+                    armedDelete === r.recordId
+                      ? 'inline text-destructive'
+                      : 'hidden text-chrome hover:text-destructive'
+                  }`}
                   aria-label={`Delete ${r.data.name}`}
                 >
-                  DELETE
+                  {armedDelete === r.recordId ? 'SURE?' : 'DELETE'}
                 </button>
               )}
             </div>

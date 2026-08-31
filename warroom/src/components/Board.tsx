@@ -306,11 +306,7 @@ export default function Board({
             locked={locked}
             // mirrors the server rule (polls delete: 'own')
             canDelete={!locked && p.createdBy === user?.id}
-            onDelete={() => {
-              if (window.confirm('Delete this poll and its votes from the board?')) {
-                void pollMutations.remove(p.recordId)
-              }
-            }}
+            onDelete={() => void pollMutations.remove(p.recordId)}
             dragPos={overridePos(p.recordId)}
             onPointerDown={(e) =>
               startDrag(e, p.recordId, 'poll', p.data.x ?? 400, p.data.y ?? 200)
