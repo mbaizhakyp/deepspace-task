@@ -94,7 +94,7 @@ function parseOptions(raw: unknown): string[] {
   return Array.isArray(v) ? v.filter((o): o is string => typeof o === 'string') : []
 }
 
-function parseSummary(raw: string): Summary | null {
+export function parseSummary(raw: string): Summary | null {
   const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
   const start = trimmed.indexOf('{')
   const end = trimmed.lastIndexOf('}')

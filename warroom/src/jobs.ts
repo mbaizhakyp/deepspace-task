@@ -150,7 +150,7 @@ async function segment(
     .slice(0, 24)
 }
 
-function extractJsonArray(raw: string): unknown[] {
+export function extractJsonArray(raw: string): unknown[] {
   const trimmed = raw.trim().replace(/^```(?:json)?\s*/i, '').replace(/\s*```$/, '')
   const start = trimmed.indexOf('[')
   const end = trimmed.lastIndexOf(']')

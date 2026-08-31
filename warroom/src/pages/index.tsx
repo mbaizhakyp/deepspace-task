@@ -1,39 +1,41 @@
 /**
- * Landing page — a STATIC page.
- *
- * It lives at the top level of src/pages/ (not under (app)/), so it renders
- * with no DeepSpace providers: no auth session fetch, no records WebSocket.
- * That makes it cheap to serve and safe for logged-out / crawler traffic.
- *
- * Need live data or auth here? Move this file to src/pages/(app)/index.tsx
- * and it becomes a dynamic page. Conversely, any page you want to keep static
- * (marketing, docs, legal) belongs at this top level.
+ * Landing — a STATIC page (no auth fetch, no records WebSocket).
+ * One screen, per design-brief.md: serif headline, the three-step loop
+ * in mono, one orange CTA. The live app lives behind /rooms.
  */
 
 import { Link } from 'react-router-dom'
-import { APP_NAME } from '../constants'
 
 export default function Landing() {
   return (
     <div
       data-testid="static-landing"
-      className="flex min-h-screen flex-col items-center justify-center px-6 text-center"
+      className="dotgrid flex min-h-screen flex-col items-center justify-center px-6 text-center"
     >
-      <p className="mb-3 text-sm uppercase tracking-widest text-muted-foreground">{APP_NAME}</p>
-      <h1 className="mb-4 max-w-2xl text-4xl font-bold tracking-tight text-foreground sm:text-5xl">
-        A DeepSpace app with a static front door
+      <p className="wire text-chrome">WARROOM</p>
+      <h1 className="mt-4 max-w-2xl font-serif text-5xl leading-tight tracking-tight text-foreground sm:text-6xl">
+        The meeting is the artifact.
       </h1>
-      <p className="mb-8 max-w-md text-muted-foreground">
-        This landing page ships no auth call and no realtime connection — it's a
-        plain static page. The live app, with sign-in and synced data, lives
-        behind the link below.
+      <p className="mt-5 max-w-lg text-[15px] leading-relaxed text-muted-foreground">
+        A war room, not a call. Import a document, argue over it as live cards with your team,
+        decide with polls — and leave with a record instead of a memory.
       </p>
+      <div className="wire mt-8 flex items-center gap-3 text-chrome">
+        <span>IMPORT</span>
+        <span className="text-primary">→</span>
+        <span>DECIDE</span>
+        <span className="text-primary">→</span>
+        <span>EXPORT</span>
+      </div>
       <Link
-        to="/home"
-        className="inline-flex items-center gap-2 rounded-full bg-primary px-5 py-2.5 text-sm font-medium text-primary-foreground transition-opacity hover:opacity-90"
+        to="/rooms"
+        className="mt-10 rounded-sm bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:brightness-110"
       >
-        Enter the app
+        Open your war room
       </Link>
+      <p className="wire mt-14 text-[10px] text-chrome/60">
+        FREE · 3 IMPORTS PER ROOM · NO CALL REQUIRED
+      </p>
     </div>
   )
 }

@@ -25,7 +25,7 @@ Beats: the alternative and why it lost
 ## B-001 · App registration blocked: quota exceeded · OPEN — NEEDS USER
 When: stage 2 · Where: `npx deepspace app init` → `[app_quota_exceeded]`
 Symptom: registration refused; existing app `forever-dolly` (app_01M0YF3SGMNED4W2NNVJ49V8P3, active, forever-dolly.app.space) holds the only slot.
-Impact: `dev start`, `test run`, `deploy` all blocked until resolved. Building continues compile-only; every runtime check is queued in PLAN under "verify once dev runs".
+Impact: `dev start`, `test run`, `deploy` all blocked until resolved — and (found at stage 10) even `npm run test:unit` is blocked: vitest.config.ts calls `appIdDefine`, which refuses the `__APP_ID__` placeholder in wrangler.toml. Building continues compile-only (tsc + eslint green through stage 10); every runtime check is queued in PLAN under "verify once dev runs".
 User decision required (CLI ships no action on purpose): (a) free the slot — `npx deepspace app undeploy app_01M0YF3SGMNED4W2NNVJ49V8P3 --yes` (removes that deployed app!) — or (b) upgrade the plan. I will not undeploy without explicit say-so.
 
 ## D-001 · No video/audio calls
