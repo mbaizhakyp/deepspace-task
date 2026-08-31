@@ -5,7 +5,7 @@ export async function callAction<T = Record<string, unknown>>(
   name: string,
   params: Record<string, unknown>,
 ): Promise<{ success: boolean; error?: string; data?: T }> {
-  const token = getAuthToken()
+  const token = await getAuthToken()
   const res = await fetch(`/api/actions/${name}`, {
     method: 'POST',
     headers: {

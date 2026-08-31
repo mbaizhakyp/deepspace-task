@@ -33,6 +33,19 @@ When: stage 7 · Where: `src/actions/google-docs.ts`
 Symptom: none yet — preemptive. `TOOLKIT='googledocs'` and `GET_DOC_TOOL='GOOGLEDOCS_GET_DOCUMENT_BY_ID'` follow Composio's published naming but tool discovery (`composio/list-tools`) is a runtime call blocked by B-001.
 Fix path: on first live run, call list-tools filtered to the googledocs toolkit and correct the constants if they differ; also verify the doc-JSON shape against `extractDocText`'s walker.
 
+## B-003 · Every server action 401'd: unawaited getAuthToken · FIXED
+When: runtime verification (first live E2E run) · Where: `warroom/src/lib/actions-client.ts`
+Symptom: warroom.spec.ts timed out at room creation; lobby never navigated; no room record created.
+Hypothesis → Root cause: `getAuthToken()` returns `Promise<string | null>` and was used synchronously, so every action call sent `Authorization: Bearer [object Promise]` → action route refused. TS didn't flag it because a Promise stringifies legally in a template literal.
+Fix: `await getAuthToken()` (taskspace's callAction confirmed the pattern). · Verified: warroom.spec.ts passes end-to-end after the fix (see run log).
+
+## B-004 · Freeze was NOT server-enforced: DO cached the wrong room id · FIXED
+When: runtime verification · Where: `warroom/worker.ts` AppRecordRoom
+Symptom: warroom.spec.ts's enforcement probe — a raw `core.put` pushed through the frozen user's live socket — LANDED (card moved to x=4242 across clients) while the board was frozen. UI looked frozen; server wasn't.
+Hypothesis → Root cause: board-ness was sniffed from the DO's FIRST fetch URL (taskspace's pattern). But a new board's first fetch is the create-room action's internal tools call (`…/api/tools/execute`), so `cachedRoomId` became `"execute"` and the interception never armed for that DO instance, forever.
+Fix: dropped URL sniffing; the room proves it is a board by its own data — the `board_settings/settings` row exists only in board rooms, and `freezeDenial` already reads it per-mutation. · Verified: the same raw-socket probe is now rejected while frozen and lands after unfreeze (warroom.spec.ts passes; full suite 11/11 + 8 unit).
+Note: this is exactly why the spec drives a mutation past the disabled UI — button-disabling would have hidden this bug through every demo.
+
 ## D-001 · No video/audio calls
 When: planning
 Decision: presence (avatars + live cursors) carries the "we're together" feeling; no LiveKit.

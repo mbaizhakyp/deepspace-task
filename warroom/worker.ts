@@ -45,19 +45,8 @@ export const __DO_MANIFEST__ = [
 ] as const satisfies DOManifest
 
 export class AppRecordRoom extends RecordRoom<Env> {
-  /** RoomId from the connect URL — 'board:<id>' rooms get freeze enforcement. */
-  private cachedRoomId: string | null = null
-
   constructor(state: DurableObjectState, env: Env) {
     super(state, env, schemas, { ownerUserId: env.OWNER_USER_ID })
-  }
-
-  override async fetch(request: Request): Promise<Response> {
-    if (!this.cachedRoomId) {
-      const parts = new URL(request.url).pathname.split('/').filter(Boolean)
-      this.cachedRoomId = parts[parts.length - 1] || null
-    }
-    return super.fetch(request)
   }
 
   /**
@@ -67,9 +56,14 @@ export class AppRecordRoom extends RecordRoom<Env> {
    * hook, so the enforcement lives at the message boundary — the same pattern
    * taskspace uses for USER_LIST. Server actions (HTTP tools path) bypass this
    * on purpose: they are facilitator-triggered orchestration.
+   *
+   * Whether this DO instance IS a board is answered by its own data — a
+   * `board_settings/settings` row exists only in board rooms (B-004: sniffing
+   * the roomId off the first fetch URL was wrong, because a new board's first
+   * fetch is the create-room action's internal tools call, not the WS connect).
    */
   override async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
-    if (typeof message === 'string' && this.cachedRoomId?.startsWith('board:')) {
+    if (typeof message === 'string') {
       try {
         const msg = JSON.parse(message) as { type?: string; payload?: { requestId?: string } }
         if (msg.type === MSG.PUT || msg.type === MSG.DELETE) {
@@ -93,7 +87,8 @@ export class AppRecordRoom extends RecordRoom<Env> {
   private freezeDenial(ws: WebSocket): string | null {
     try {
       // ponytail: one SQL read per mutation message; cache behind a settings
-      // version if boards ever see write-heavy traffic
+      // version if boards ever see write-heavy traffic. In the app-scope room
+      // this row never exists, so the check is a cheap no-op there.
       const rows = this.sql
         .exec(`SELECT col_frozenby, col_facilitatorid FROM c_board_settings WHERE _row_id = 'settings'`)
         .toArray() as Array<{ col_frozenby: string | null; col_facilitatorid: string | null }>
@@ -103,7 +98,7 @@ export class AppRecordRoom extends RecordRoom<Env> {
       if (attachment?.userId && attachment.userId === s.col_facilitatorid) return null
       return 'permission denied: board is frozen by the facilitator'
     } catch {
-      return null // settings table absent → board was never frozen
+      return null // settings table absent → not a board / never frozen
     }
   }
 }

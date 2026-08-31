@@ -128,6 +128,16 @@ export default function Board({
     })
   }
 
+  // Dev-only test hook: lets the freeze spec push a raw mutation through this
+  // client's real authenticated socket, past the disabled UI — proving the
+  // server (not the button state) rejects writes while frozen.
+  if (import.meta.env.DEV && typeof window !== 'undefined') {
+    ;(window as unknown as Record<string, unknown>).__warroomTest = {
+      putCard: (id: string, patch: Record<string, unknown>) => put(id, patch as Partial<CardData>),
+      cards: cards.map((c) => ({ id: c.recordId, x: c.data.x, y: c.data.y })),
+    }
+  }
+
   async function toggleFreeze() {
     const res = await callAction('set-freeze', {
       roomId,
@@ -299,7 +309,10 @@ export default function Board({
       {frozen && (
         <>
           <div className="pointer-events-none absolute inset-0 z-50 rounded-sm border-2 border-primary" />
-          <div className="wire absolute left-1/2 top-16 z-50 -translate-x-1/2 rounded-sm border border-primary bg-card px-4 py-1.5 text-primary">
+          <div
+            data-testid="frozen-banner"
+            className="wire absolute left-1/2 top-16 z-50 -translate-x-1/2 rounded-sm border border-primary bg-card px-4 py-1.5 text-primary"
+          >
             BOARD FROZEN BY {(settings?.frozenByName ?? 'FACILITATOR').toUpperCase()}
           </div>
         </>
