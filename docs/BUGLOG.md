@@ -55,8 +55,12 @@ Fix: lobby rows now carry `<FACILITATOR>'S ROOM · <date opened>` (facilitator n
 Defense shipped earlier stays: create double-submit ref guard; audit trail records every create/join.
 Related accepted ceiling: join-room read-modify-write race on memberIds can drop one of two same-instant joiners (self-heals on reload).
 
-## B-002 · Composio Google Docs: "THAT DOCUMENT CAME BACK EMPTY" · OPEN — diagnostics shipped
-Update (2026-08-31): user hit it live. Prod logs confirm `import-gdoc` ran and answered 200 — the Composio call SUCCEEDED (no requiresConnection, no error), but `extractDocText` found nothing, so either the tool slug returns a different JSON shape than the Google-Docs-API walker expects, or the slug maps to a different tool. The action now returns (and the audit trail records) the response's key-shape — one retry after deploy tells us exactly what to fix.
+## B-002 · Composio Google Docs: "THAT DOCUMENT CAME BACK EMPTY" · FIXED
+When: stage 7 (flagged pre-runtime) → hit live by user 2026-08-31 · Where: `src/actions/google-docs.ts`
+Symptom: Google Doc import failed with "that document came back empty" although the Composio call succeeded (200, no requiresConnection).
+Diagnosis path: shipped shape-of-response diagnostics; the user's retry returned `{body:{content:[6]},documentId,title,namedStyles,…}` — a perfectly valid Google Docs resource **at the TOP level of the integration result**. My code read `payload.data` (one level too deep → undefined → empty text). The tool slug (`GOOGLEDOCS_GET_DOCUMENT_BY_ID`) and the text walker were both correct.
+Fix: `extractDocText(payload.data ?? payload)` + a unit regression test using the exact reported shape. · Verified: 10/10 unit tests green; user retry on prod is the final confirmation.
+Lesson recorded: the shape-reporting error message turned a blind guess into a one-line fix from a single user retry — that's the audit/diagnostics loop working as designed (D-015).
 
 ## D-015 · One audit trail, three writers, platform reporter for the client half
 When: 2026-08-31 (user request: action + error loggers, admin-reviewable)

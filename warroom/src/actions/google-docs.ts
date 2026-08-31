@@ -66,7 +66,9 @@ export const importGoogleDoc: ActionHandler<Env> = async ({ userId, params, tool
     return { success: false, error: 'could not start the Google connection' }
   }
 
-  const text = extractDocText(payload.data)
+  // B-002: the platform hands back the document resource at the TOP level of
+  // the integration result (body/title/documentId...), not nested under .data
+  const text = extractDocText(payload.data ?? payload)
   if (!text.trim()) {
     // B-002 diagnostics: return the envelope's SHAPE (keys only, no content)
     // so the audit trail captures what Composio actually sent back and the

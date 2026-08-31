@@ -40,6 +40,29 @@ describe('parseSummary (AI dispatch output)', () => {
   })
 })
 
+describe('extractDocText (Google Docs resource, real shape from B-002)', () => {
+  it('extracts text when the doc resource is the payload itself (no .data nesting)', async () => {
+    const { extractDocText } = await import('./actions/google-docs')
+    const doc = {
+      title: 'Q3 Plan',
+      documentId: 'abc',
+      display_url: 'https://…',
+      body: {
+        content: [
+          { sectionBreak: {} },
+          { paragraph: { elements: [{ textRun: { content: 'Hello ' } }, { textRun: { content: 'world.\n' } }] } },
+        ],
+      },
+    }
+    expect(extractDocText(doc)).toContain('Hello world.')
+    expect(extractDocText(doc)).toContain('Q3 Plan')
+  })
+  it('returns empty for undefined', async () => {
+    const { extractDocText } = await import('./actions/google-docs')
+    expect(extractDocText(undefined)).toBe('')
+  })
+})
+
 describe('parseMemberIds (stored membership json)', () => {
   it('accepts arrays and JSON strings', () => {
     expect(parseMemberIds(['a', 'b'])).toEqual(['a', 'b'])
