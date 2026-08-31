@@ -11,6 +11,8 @@ import { Button, Input, Modal, Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
 import { PollCard, type PollData } from './PollCard'
 import { ImportPanel } from './ImportPanel'
+import { SummaryPanel } from './SummaryPanel'
+import type { Summary } from '../actions/summarize'
 
 export type CardData = {
   title: string
@@ -30,10 +32,14 @@ export default function Board({
   roomId,
   roomName,
   facilitatorId,
+  summary,
+  summaryAt,
 }: {
   roomId: string
   roomName: string
   facilitatorId: string
+  summary: Summary | null
+  summaryAt: number | null
 }) {
   const { user } = useAuthUser()
   const { records: cards } = useQuery<CardData>('cards', {})
@@ -44,7 +50,8 @@ export default function Board({
   const pollMutations = useMutations<PollData>('polls')
   const eventMutations = useMutations<EventData>('events')
   const [pollDialogOpen, setPollDialogOpen] = useState(false)
-  const [importOpen, setImportOpen] = useState(false)
+  const [panel, setPanel] = useState<'none' | 'import' | 'summary'>('none')
+  const importOpen = panel === 'import'
   const { warning } = useToast()
 
   const settings = settingsRecords[0]?.data
@@ -165,7 +172,7 @@ export default function Board({
           </button>
         )}
         <button
-          onClick={() => setImportOpen((v) => !v)}
+          onClick={() => setPanel(importOpen ? 'none' : 'import')}
           disabled={locked}
           className={`wire rounded-sm border px-3 py-2 disabled:opacity-50 ${importOpen ? 'border-primary text-primary' : 'border-border text-chrome hover:border-chrome hover:text-foreground'}`}
         >
@@ -181,6 +188,12 @@ export default function Board({
         <Button size="sm" onClick={addCard} disabled={!ready || locked}>
           Add card
         </Button>
+        <button
+          onClick={() => setPanel(panel === 'summary' ? 'none' : 'summary')}
+          className="rounded-sm bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground"
+        >
+          Summarize
+        </button>
       </div>
 
       {pollDialogOpen && (
@@ -270,7 +283,16 @@ export default function Board({
         </div>
       </div>
 
-      {importOpen && <ImportPanel roomId={roomId} onClose={() => setImportOpen(false)} />}
+      {importOpen && <ImportPanel roomId={roomId} onClose={() => setPanel('none')} />}
+      {panel === 'summary' && (
+        <SummaryPanel
+          roomId={roomId}
+          roomName={roomName}
+          summary={summary}
+          summaryAt={summaryAt}
+          onClose={() => setPanel('none')}
+        />
+      )}
       </div>
 
       {/* frozen chrome */}

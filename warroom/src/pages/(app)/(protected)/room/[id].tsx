@@ -11,7 +11,28 @@ import { boardSchemas } from '../../../../schemas'
 import { callAction } from '../../../../lib/actions-client'
 import Board from '../../../../components/Board'
 
-type Room = { name: string; facilitatorId: string }
+import type { Summary } from '../../../../actions/summarize'
+
+type Room = {
+  name: string
+  facilitatorId: string
+  summary?: unknown
+  summaryAt?: number | null
+}
+
+function parseSummary(raw: unknown): Summary | null {
+  const v = typeof raw === 'string' ? safeJson(raw) : raw
+  if (!v || typeof v !== 'object') return null
+  const o = v as Record<string, unknown>
+  return typeof o.headline === 'string' && Array.isArray(o.decisions) ? (o as Summary) : null
+}
+function safeJson(s: string): unknown {
+  try {
+    return JSON.parse(s)
+  } catch {
+    return null
+  }
+}
 
 export default function RoomPage() {
   const { id } = useParams<{ id: string }>()
@@ -62,6 +83,8 @@ export default function RoomPage() {
         roomId={id}
         roomName={room.data.name}
         facilitatorId={room.data.facilitatorId}
+        summary={parseSummary(room.data.summary)}
+        summaryAt={room.data.summaryAt ?? null}
       />
     </RecordScope>
   )

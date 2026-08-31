@@ -94,6 +94,18 @@ Decision: membership's source of truth is `MemberIds` (json) on the app-scope ro
 Why: one source of truth for both the WS gate (D-009) and the lobby query; a separate members collection would be a second copy to keep in sync.
 Beats: per-room members records (drift risk, more schema).
 
+## D-013 · Build order swap: summary/payments before Google Docs OAuth
+When: stage 6 (user away, B-001 open)
+Decision: stages run 6 → 8 → 9 → 7. Google Docs via Composio moves last.
+Why: Composio's toolkit/tool slugs are discovered by runtime API calls (needs app registration, blocked by B-001) and testing needs the user's Google consent in a browser; summary/export and payment declarations are pure code I can compile-verify now.
+Beats: writing speculative Composio code against guessed slugs — guessed integration code is how agents ship broken OAuth.
+
+## D-014 · Import quota is per-room and enforced in the job handler
+When: stage 6
+Decision: any member's client may enqueue an import over WS; the HANDLER re-derives identity from job.enqueuedBy (server-stamped), checks membership + the 3-free-imports quota against the app-scope room record, and only then acts. payload.roomId is untrusted until that check.
+Why: client-side enqueue is the platform's native path (useJobs); gating at enqueue would need a custom action AND still leave the WS path open. One choke point at execution covers every path.
+Beats: a start-import server action (second path to secure, worse progress UX).
+
 ## D-007 · Per-board record rooms (`board:<id>`), registry in app scope
 When: planning
 Decision: each board is its own DO room with its own members/cards/polls; app scope holds only the rooms registry + users.
