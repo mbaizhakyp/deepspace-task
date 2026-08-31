@@ -43,7 +43,11 @@ export async function runJob(job: Job, ctx: JobContext, env: Env): Promise<unkno
 
 async function importText(job: Job, ctx: JobContext, env: Env): Promise<unknown> {
   const { roomId, text, mode, userName } = (job.payload ?? {}) as ImportPayload
-  const userId = job.enqueuedBy
+  // `verified:` marks an enqueue from the start-import action, which already
+  // checked quota + subscription tier. Only server code can set enqueuedBy —
+  // WS enqueues get the socket's plain userId stamped by the room.
+  const verified = job.enqueuedBy?.startsWith('verified:') ?? false
+  const userId = verified ? job.enqueuedBy!.slice('verified:'.length) : job.enqueuedBy
   if (!userId || !roomId || typeof text !== 'string' || !text.trim()) {
     throw new Error('invalid import request')
   }
@@ -59,8 +63,9 @@ async function importText(job: Job, ctx: JobContext, env: Env): Promise<unknown>
 
   const used = room.importCount ?? 0
   // ponytail: quota is per-room, not per-user — a room's members share 3 free
-  // imports; per-user metering when payments demand it (stage 9 gates Pro here)
-  if (used >= FREE_IMPORT_LIMIT) {
+  // imports. The start-import action lifts it for entitled Pro users (its
+  // `verified:` marker); a raw WS enqueue only ever gets the free quota.
+  if (!verified && used >= FREE_IMPORT_LIMIT) {
     throw new Error(`free import limit reached (${FREE_IMPORT_LIMIT}) — Pro removes it`)
   }
   await app.update('rooms', roomId, { importCount: used + 1 })

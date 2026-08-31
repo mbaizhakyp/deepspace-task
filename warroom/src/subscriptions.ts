@@ -12,16 +12,12 @@
  */
 
 export const subscriptionPlans = [
-  // Example paid tier. Uncomment, edit, then `deepspace deploy` to sync it to
-  // Stripe. Paid checkout becomes available after the app owner finishes
-  // Stripe Connect onboarding at /earnings.
-  // {
-  //   slug: 'pro',
-  //   name: 'Pro',
-  //   priceCents: 900,           // $9/month
-  //   yearlyCents: 9000,         // optional, $90/year (drop for month-only)
-  //   taxCode: 'txcd_10000000',  // optional, defaults to this (digital services)
-  // },
+  {
+    slug: 'pro',
+    name: 'Pro',
+    priceCents: 900, // $9/month — unlimited imports
+    yearlyCents: 9000,
+  },
 ] as const
 
 export type SubscriptionPlanSlug = (typeof subscriptionPlans)[number] extends never

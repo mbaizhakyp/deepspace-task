@@ -6,18 +6,21 @@
  */
 
 import { useState } from 'react'
+import { Link } from 'react-router-dom'
 import { useAuthUser, useJobs } from 'deepspace'
+import { callAction } from '../lib/actions-client'
 
 type ImportPayload = { roomId: string; text: string; mode: 'cards' | 'key-points'; userName?: string }
 type ImportResult = { created?: number }
 
 export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () => void }) {
   const { user } = useAuthUser()
-  const { jobs, connected, enqueue } = useJobs<ImportPayload, ImportResult>(`board:${roomId}`)
+  const { jobs, connected } = useJobs<ImportPayload, ImportResult>(`board:${roomId}`)
   const [text, setText] = useState('')
   const [mode, setMode] = useState<'cards' | 'key-points'>('cards')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
+  const [needsUpgrade, setNeedsUpgrade] = useState(false)
 
   const current = jobs.find((j) => j.type === 'import-text')
   const running = current?.status === 'queued' || current?.status === 'running'
@@ -26,19 +29,19 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
     if (!text.trim() || running || submitting) return
     setSubmitting(true)
     setSubmitError(null)
-    try {
-      await enqueue('import-text', {
-        roomId,
-        text,
-        mode,
-        userName: user?.fullName ?? '',
-      }, { maxAttempts: 1 })
-      setText('')
-    } catch (e) {
-      setSubmitError(e instanceof Error ? e.message : 'enqueue failed')
-    } finally {
-      setSubmitting(false)
-    }
+    setNeedsUpgrade(false)
+    // start-import checks membership + the free quota + Pro entitlement
+    // server-side, then enqueues the job; progress streams back via useJobs
+    const res = await callAction('start-import', {
+      roomId,
+      text,
+      mode,
+      userName: user?.fullName ?? '',
+    })
+    setSubmitting(false)
+    if (res.success) setText('')
+    else if (res.error === 'upgrade_required') setNeedsUpgrade(true)
+    else setSubmitError(res.error ?? 'import failed')
   }
 
   return (
@@ -96,6 +99,17 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
           >
             Import to the board
           </button>
+          {needsUpgrade && (
+            <div className="mt-3 rounded-sm border border-primary/50 p-3">
+              <div className="wire text-primary">FREE IMPORTS USED UP</div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                This room has used its 3 free imports.{' '}
+                <Link to="/pricing" className="text-primary underline-offset-2 hover:underline">
+                  Pro removes the limit.
+                </Link>
+              </p>
+            </div>
+          )}
           {(submitError || current?.status === 'failed') && (
             <div className="wire mt-3 text-destructive">
               {(submitError ?? current?.error ?? 'IMPORT FAILED').toUpperCase()}
