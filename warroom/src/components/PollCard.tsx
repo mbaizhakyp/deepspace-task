@@ -37,6 +37,8 @@ export function PollCard({
   data,
   isFacilitator,
   locked,
+  canDelete,
+  onDelete,
   onPointerDown,
   dragPos,
 }: {
@@ -44,6 +46,8 @@ export function PollCard({
   data: PollData
   isFacilitator: boolean
   locked: boolean
+  canDelete: boolean
+  onDelete: () => void
   onPointerDown: (e: React.PointerEvent) => void
   dragPos: { x: number; y: number } | null
 }) {
@@ -143,11 +147,18 @@ export function PollCard({
               ? `YOU VOTED · ${total} VOTED`
               : `${total} VOTED`}
         </span>
-        {!closed && isFacilitator && (
-          <button onClick={closePoll} className="wire text-signal hover:underline">
-            CLOSE
-          </button>
-        )}
+        <span className="flex items-center gap-3">
+          {canDelete && (
+            <button onClick={onDelete} className="wire text-ink-muted hover:text-ink">
+              DELETE
+            </button>
+          )}
+          {!closed && isFacilitator && (
+            <button onClick={closePoll} className="wire text-signal hover:underline">
+              CLOSE
+            </button>
+          )}
+        </span>
       </div>
     </div>
   )

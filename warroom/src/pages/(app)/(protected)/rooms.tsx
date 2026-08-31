@@ -12,6 +12,15 @@ import { callAction } from '../../../lib/actions-client'
 
 type Room = { name: string; facilitatorId: string; memberIds?: unknown }
 
+/** Accepts a full room URL or a bare room code (the id in the link). */
+export function parseRoomCode(input: string): string | null {
+  const s = input.trim()
+  if (!s) return null
+  const fromUrl = s.match(/\/room\/([A-Za-z0-9_-]+)/)
+  if (fromUrl) return fromUrl[1]
+  return /^[A-Za-z0-9_-]{6,}$/.test(s) ? s : null
+}
+
 export default function RoomsPage() {
   const { user } = useAuthUser()
   const { records: rooms, status } = useQuery<Room>('rooms', { orderBy: 'createdAt', orderDir: 'desc' })
@@ -20,6 +29,7 @@ export default function RoomsPage() {
   const { users: roster } = useUsers()
   const [name, setName] = useState('')
   const [creating, setCreating] = useState(false)
+  const [joinCode, setJoinCode] = useState('')
   const createGuard = useRef(false)
   const navigate = useNavigate()
   const { error } = useToast()
@@ -38,6 +48,11 @@ export default function RoomsPage() {
     createGuard.current = false
     if (res.success && res.data?.roomId) navigate(`/room/${res.data.roomId}`)
     else error('Could not open the room', res.error)
+  }
+
+  function joinByCode() {
+    const id = parseRoomCode(joinCode)
+    if (id) navigate(`/room/${id}`)
   }
 
   async function deleteRoom(roomId: string, roomName: string) {
@@ -63,6 +78,23 @@ export default function RoomsPage() {
         <Button onClick={create} disabled={creating || !name.trim()}>
           Open a room
         </Button>
+      </div>
+
+      <div className="mt-3 flex gap-3">
+        <Input
+          value={joinCode}
+          onChange={(e) => setJoinCode(e.target.value)}
+          onKeyDown={(e) => e.key === 'Enter' && joinByCode()}
+          placeholder="Invited? Paste the room link or code"
+          className="flex-1"
+        />
+        <button
+          onClick={joinByCode}
+          disabled={!parseRoomCode(joinCode)}
+          className="wire rounded-sm border border-border px-4 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-40"
+        >
+          JOIN
+        </button>
       </div>
 
       <div className="mt-10 flex flex-col gap-2">

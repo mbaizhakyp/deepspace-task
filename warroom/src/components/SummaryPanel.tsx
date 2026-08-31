@@ -23,15 +23,25 @@ export function SummaryPanel({
 }) {
   const { user } = useAuthUser()
   const [working, setWorking] = useState(false)
+  const [stage, setStage] = useState(0)
   const [error, setError] = useState<string | null>(null)
+
+  // honest indeterminate progress: the summary is one AI call (~5–15s), so
+  // these are elapsed-time stages, not fake percentages
+  // ponytail: converting summarize to a JobRoom job (real progress like the
+  // import) is the upgrade path if summaries ever grow past one call
+  const STAGES = ['READING THE BOARD', 'WEIGHING THE POLLS', 'WRITING THE DISPATCH']
 
   async function run() {
     setWorking(true)
+    setStage(0)
     setError(null)
+    const ticker = setInterval(() => setStage((s) => Math.min(s + 1, 2)), 3500)
     const res = await callAction('summarize', {
       roomId,
       userName: user?.fullName ?? '',
     })
+    clearInterval(ticker)
     setWorking(false)
     if (!res.success) setError(res.error ?? 'summary failed')
   }
@@ -66,7 +76,19 @@ export function SummaryPanel({
         What was decided.
       </div>
 
-      {summary ? (
+      {working ? (
+        <div className="mt-6">
+          <div className="h-0.5 rounded-full bg-ink/10">
+            <div
+              className="h-0.5 rounded-full bg-signal transition-all duration-1000"
+              style={{ width: `${[15, 55, 85][stage]}%` }}
+            />
+          </div>
+          <div className="wire wire-tick mt-3 text-ink" key={stage}>
+            {STAGES[stage]}
+          </div>
+        </div>
+      ) : summary ? (
         <>
           <p className="mt-4 text-[13px] leading-relaxed text-ink">{summary.headline}</p>
           <div className="mt-5 border-t border-ink/15 pt-5">

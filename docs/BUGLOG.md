@@ -81,6 +81,30 @@ Taken (real): B-006 poll lifecycle holes; delete-× shown on cards the server wo
 Already solved in shipped code (review read pre-build docs): vote overwrite (userBound + uniqueOn + update:'own' — deterministic ids were never shipped); freeze role-loop atomicity + mid-freeze joiners (D-008 interception has neither problem); hand-rolled import loop (platform JobRoom, D-010); summary rate-limit (server-side summaryAt check).
 Declined: making per-account import metering real now (accepted ceiling, D-014); stripping the card-rotation design work (already done and cheap; design polish never displaced a correctness fix).
 
+## B-007 · Presence counted tabs, not people · FIXED
+When: user report, 2026-08-31 · Where: Board presence roster
+Symptom: 2 users, one opens the room in a second tab → "3 PRESENT" and a duplicate avatar; your own second tab even shows you your own cursor.
+Root cause: presence is per-connection (correct at the transport layer); the UI rendered connections as people.
+Fix: client-side dedupe — drop peers matching your own userId and keep the first connection per user. Decision folded in: multiple tabs from one account ARE allowed (harmless, and blocking them would fight browser reality); they just count once. · Verified: suite green; manual two-tab check pending user confirmation.
+
+## B-008 · Cards shake for a frame after drag release · FIXED
+When: user report, 2026-08-31 · Where: Board drag handling
+Symptom: on release, the dragged card twitches for ~a frame before settling.
+Root cause: drag streams positions at 120ms intervals; on release the local drag override was removed immediately, so the card rendered the last SYNCED (up to 120ms stale) position until the final write echoed back.
+Fix: hold the drop position as a local override for 800ms while the echo lands (`settled` state). · Verified: suite green; visual check pending user confirmation.
+
+## D-017 · Joining a meeting: the link IS the code, and now the UI says so
+When: user question ("how to join someone's meeting?"), 2026-08-31
+Decision: two additions — an INVITE button in the room header (copies the room link, confirms "LINK COPIED") and a lobby field "Invited? Paste the room link or code" that accepts a full URL or the bare room id. No separate code system.
+Why: the join mechanism (shareable link, G2) existed but was invisible — the facilitator had to copy the address bar and know to do it. The room id already is an unguessable code; minting a second one would be reinvention.
+Beats: Zoom-style short codes + a code registry (new collection, collision handling, expiry — for zero added security over the id).
+
+## D-018 · Summary keeps its synchronous action; gets honest staged progress
+When: user request ("show AI summary thinking process, async like import"), 2026-08-31
+Decision: the summary stays one synchronous action call; the panel now shows an elapsed-time staged progress line (READING THE BOARD → WEIGHING THE POLLS → WRITING THE DISPATCH) — indeterminate but honest, no fake percentages. The import keeps its REAL progress (it's a durable job creating N cards).
+Why: the summary is a single ~5–15s AI call — there is no intermediate state to report; converting it to a JobRoom job buys real progress only if summaries ever become multi-step (upgrade path noted in code).
+Beats: fake percentage bars (dishonest) and a job conversion now (cost without new information).
+
 ## D-001 · No video/audio calls
 When: planning
 Decision: presence (avatars + live cursors) carries the "we're together" feeling; no LiveKit.

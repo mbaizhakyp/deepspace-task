@@ -61,7 +61,12 @@ export default function Board({
   const locked = frozen && !isFacilitator
 
   // ── presence: cursors + roster ──────────────────────────────────────
-  const { peers, updateState } = usePresenceRoom(`board:${roomId}`)
+  const { peers: rawPeers, updateState } = usePresenceRoom(`board:${roomId}`)
+  // one person = one presence, however many tabs they have open (B-007):
+  // drop our own other tabs and keep the first connection per user
+  const peers = rawPeers.filter(
+    (p, i) => p.userId !== user?.id && rawPeers.findIndex((q) => q.userId === p.userId) === i,
+  )
   const fieldRef = useRef<HTMLDivElement>(null)
   const lastCursorSent = useRef(0)
 
@@ -112,9 +117,24 @@ export default function Board({
     }
   }
 
+  // Post-drop settle (B-008): after release, the card would render the last
+  // SYNCED position (up to 120ms stale) until the final write echoes back —
+  // a one-frame shake. Hold the drop position locally while the echo lands.
+  const [settled, setSettled] = useState<{ id: string; x: number; y: number } | null>(null)
+
   function endDrag() {
-    if (drag) syncDragPosition(drag.id, drag.kind, drag.x, drag.y)
+    if (drag) {
+      syncDragPosition(drag.id, drag.kind, drag.x, drag.y)
+      setSettled({ id: drag.id, x: drag.x, y: drag.y })
+      setTimeout(() => setSettled(null), 800)
+    }
     setDrag(null)
+  }
+
+  function overridePos(id: string): { x: number; y: number } | null {
+    if (drag?.id === id) return { x: drag.x, y: drag.y }
+    if (settled?.id === id) return { x: settled.x, y: settled.y }
+    return null
   }
 
   // ── card CRUD ───────────────────────────────────────────────────────
@@ -140,6 +160,18 @@ export default function Board({
       putPoll: (id: string, patch: Record<string, unknown>) => pollMutations.put(id, patch as Partial<PollData>),
       createVote: (data: Record<string, unknown>) =>
         voteMutations.create(data as { pollId: string; voterId: string; optionIndex: number }),
+    }
+  }
+
+  const [invited, setInvited] = useState(false)
+  async function copyInvite() {
+    // the room URL is the invite — anyone signed in who opens it becomes a member
+    try {
+      await navigator.clipboard.writeText(window.location.href)
+      setInvited(true)
+      setTimeout(() => setInvited(false), 2000)
+    } catch {
+      warning('Could not copy', 'Copy the address bar URL instead')
     }
   }
 
@@ -174,6 +206,12 @@ export default function Board({
           <span className="h-1.5 w-1.5 rounded-full bg-live breathe" />
           <span className="wire text-chrome">{peers.length + 1} PRESENT</span>
         </div>
+        <button
+          onClick={copyInvite}
+          className="wire rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground"
+        >
+          {invited ? 'LINK COPIED' : 'INVITE'}
+        </button>
         {isFacilitator && (
           <button
             onClick={toggleFreeze}
@@ -247,7 +285,7 @@ export default function Board({
             key={c.recordId}
             id={c.recordId}
             data={c.data}
-            dragPos={drag?.id === c.recordId ? { x: drag.x, y: drag.y } : null}
+            dragPos={overridePos(c.recordId)}
             shake={shakeId === c.recordId}
             locked={locked}
             // mirror the server rule (delete: 'own') — showing × on cards the
@@ -266,7 +304,14 @@ export default function Board({
             data={p.data}
             isFacilitator={isFacilitator}
             locked={locked}
-            dragPos={drag?.kind === 'poll' && drag.id === p.recordId ? { x: drag.x, y: drag.y } : null}
+            // mirrors the server rule (polls delete: 'own')
+            canDelete={!locked && p.createdBy === user?.id}
+            onDelete={() => {
+              if (window.confirm('Delete this poll and its votes from the board?')) {
+                void pollMutations.remove(p.recordId)
+              }
+            }}
+            dragPos={overridePos(p.recordId)}
             onPointerDown={(e) =>
               startDrag(e, p.recordId, 'poll', p.data.x ?? 400, p.data.y ?? 200)
             }
