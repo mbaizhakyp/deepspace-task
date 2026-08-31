@@ -12,6 +12,7 @@ import {
   CanvasRoom,
   CronRoom,
   JobRoom,
+  MSG,
   PresenceRoom,
   RecordRoom,
   resolveAppRole,
@@ -44,8 +45,66 @@ export const __DO_MANIFEST__ = [
 ] as const satisfies DOManifest
 
 export class AppRecordRoom extends RecordRoom<Env> {
+  /** RoomId from the connect URL — 'board:<id>' rooms get freeze enforcement. */
+  private cachedRoomId: string | null = null
+
   constructor(state: DurableObjectState, env: Env) {
     super(state, env, schemas, { ownerUserId: env.OWNER_USER_ID })
+  }
+
+  override async fetch(request: Request): Promise<Response> {
+    if (!this.cachedRoomId) {
+      const parts = new URL(request.url).pathname.split('/').filter(Boolean)
+      this.cachedRoomId = parts[parts.length - 1] || null
+    }
+    return super.fetch(request)
+  }
+
+  /**
+   * Facilitator freeze (D-008): while board_settings.frozenBy is set, realtime
+   * mutations from anyone but the facilitator are rejected with a failed ack.
+   * RBAC can't express a time-varying rule, and RecordRoom has no authorize
+   * hook, so the enforcement lives at the message boundary — the same pattern
+   * taskspace uses for USER_LIST. Server actions (HTTP tools path) bypass this
+   * on purpose: they are facilitator-triggered orchestration.
+   */
+  override async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
+    if (typeof message === 'string' && this.cachedRoomId?.startsWith('board:')) {
+      try {
+        const msg = JSON.parse(message) as { type?: string; payload?: { requestId?: string } }
+        if (msg.type === MSG.PUT || msg.type === MSG.DELETE) {
+          const denial = this.freezeDenial(ws)
+          if (denial) {
+            const requestId = msg.payload?.requestId
+            if (requestId) {
+              ws.send(JSON.stringify({ type: MSG.ACK, payload: { requestId, success: false, error: denial } }))
+            }
+            return
+          }
+        }
+      } catch {
+        // not JSON — fall through to the base handler
+      }
+    }
+    return super.webSocketMessage(ws, message)
+  }
+
+  /** Non-null = reject reason: board frozen and sender isn't the facilitator. */
+  private freezeDenial(ws: WebSocket): string | null {
+    try {
+      // ponytail: one SQL read per mutation message; cache behind a settings
+      // version if boards ever see write-heavy traffic
+      const rows = this.sql
+        .exec(`SELECT col_frozenby, col_facilitatorid FROM c_board_settings WHERE _row_id = 'settings'`)
+        .toArray() as Array<{ col_frozenby: string | null; col_facilitatorid: string | null }>
+      const s = rows[0]
+      if (!s?.col_frozenby) return null
+      const attachment = ws.deserializeAttachment() as { userId?: string } | null
+      if (attachment?.userId && attachment.userId === s.col_facilitatorid) return null
+      return 'permission denied: board is frozen by the facilitator'
+    } catch {
+      return null // settings table absent → board was never frozen
+    }
   }
 }
 

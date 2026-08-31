@@ -16,6 +16,45 @@ function jwtConfig(env: Env): JwtVerifierConfig {
   return { publicKey: env.AUTH_JWT_PUBLIC_KEY, issuer: env.AUTH_JWT_ISSUER }
 }
 
+/**
+ * Board rooms are member-gated (D-009): any authenticated user can open a
+ * WebSocket to any room id, so isolation must happen here, before the DO.
+ * Membership truth is the app-scope rooms record's memberIds (D-012) — the
+ * same pattern the scaffold uses for docs-Yjs access above.
+ */
+async function isBoardMember(env: Env, boardRoomId: string, userId: string): Promise<boolean> {
+  const recordId = boardRoomId.slice('board:'.length)
+  const stub = env.RECORD_ROOMS.get(env.RECORD_ROOMS.idFromName(`app:${env.DEEPSPACE_APP_ID}`))
+  try {
+    const res = await stub.fetch(
+      new Request('https://internal/api/tools/execute', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+          'X-User-Id': env.OWNER_USER_ID,
+          'X-App-Action': 'true',
+        },
+        body: JSON.stringify({
+          tool: 'records.get',
+          params: { collection: 'rooms', recordId },
+        }),
+      }),
+    )
+    const json = (await res.json()) as {
+      success?: boolean
+      data?: { record?: { data?: { memberIds?: unknown; facilitatorId?: string } } }
+    }
+    const data = json.success ? json.data?.record?.data : undefined
+    if (!data) return false
+    if (data.facilitatorId === userId) return true
+    const raw = data.memberIds
+    const ids = typeof raw === 'string' ? JSON.parse(raw) : raw
+    return Array.isArray(ids) && ids.includes(userId)
+  } catch {
+    return false // fail closed
+  }
+}
+
 function wsRoute(
   doNamespace: (env: Env) => DurableObjectNamespace,
   extraIdentity?: (auth: VerifyResult, env: Env) => { role?: string } | Promise<{ role?: string }>,
@@ -30,6 +69,13 @@ function wsRoute(
     if (token) {
       auth = (await verifyJwt(jwtConfig(c.env), token)).result
       if (!auth) return new Response('Unauthorized', { status: 401 })
+    }
+
+    if (id.startsWith('board:')) {
+      if (!auth) return new Response('Unauthorized', { status: 401 })
+      if (!(await isBoardMember(c.env, id, auth.userId))) {
+        return new Response('Forbidden', { status: 403 })
+      }
     }
     const roomRequest = authenticatedRoomRequest(
       c.req.raw,
