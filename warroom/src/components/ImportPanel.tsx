@@ -9,6 +9,7 @@ import { useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthUser, useJobs } from 'deepspace'
 import { callAction } from '../lib/actions-client'
+import type { GDocListing } from '../actions/google-docs'
 
 type ImportPayload = { roomId: string; text: string; mode: 'cards' | 'key-points'; userName?: string }
 type ImportResult = { created?: number }
@@ -24,44 +25,80 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [needsUpgrade, setNeedsUpgrade] = useState(false)
   const [connecting, setConnecting] = useState(false)
+  const [docs, setDocs] = useState<GDocListing[] | null>(null)
+  const [browsing, setBrowsing] = useState(false)
 
   const current = jobs.find((j) => j.type === 'import-text')
   const running = current?.status === 'queued' || current?.status === 'running'
 
-  async function start() {
-    const input = source === 'paste' ? text.trim() : docUrl.trim()
-    if (!input || running || submitting) return
+  /** Shared handling of a connection-needed response: open consent, ask to retry. */
+  function handleConnection(res: { success: boolean; data?: unknown }): boolean {
+    const conn = res.success
+      ? (res.data as { needsConnection?: boolean; redirectUrl?: string } | undefined)
+      : undefined
+    if (!conn?.needsConnection) return false
+    setConnecting(true)
+    if (typeof conn.redirectUrl === 'string') {
+      window.open(conn.redirectUrl, 'warroom-google-auth', 'width=520,height=640')
+    }
+    return true
+  }
+
+  async function browseDocs() {
+    if (browsing) return
+    setBrowsing(true)
+    setSubmitError(null)
+    setConnecting(false)
+    const res = await callAction<{ docs?: GDocListing[]; needsConnection?: boolean; redirectUrl?: string }>(
+      'list-gdocs',
+      {},
+    )
+    setBrowsing(false)
+    if (handleConnection(res)) return
+    if (res.success && res.data?.docs) setDocs(res.data.docs)
+    else setSubmitError(res.error ?? 'could not list your docs')
+  }
+
+  async function importDoc(params: { docId?: string; url?: string }) {
+    if (running || submitting) return
     setSubmitting(true)
     setSubmitError(null)
     setNeedsUpgrade(false)
     setConnecting(false)
-    // both actions check membership + free quota + Pro entitlement
-    // server-side, then enqueue the job; progress streams back via useJobs
-    const res =
-      source === 'paste'
-        ? await callAction('start-import', { roomId, text, mode, userName: user?.fullName ?? '' })
-        : await callAction<{ needsConnection?: boolean; redirectUrl?: string }>('import-gdoc', {
-            roomId,
-            url: docUrl,
-            mode,
-            userName: user?.fullName ?? '',
-          })
+    const res = await callAction<{ needsConnection?: boolean; redirectUrl?: string }>('import-gdoc', {
+      roomId,
+      ...params,
+      mode,
+      userName: user?.fullName ?? '',
+    })
     setSubmitting(false)
-    const connection = res.success
-      ? (res.data as { needsConnection?: boolean; redirectUrl?: string } | undefined)
-      : undefined
-    if (connection?.needsConnection) {
-      // the requiresConnection dance: open Google's consent, then retry
-      setConnecting(true)
-      if (typeof connection.redirectUrl === 'string') {
-        window.open(connection.redirectUrl, 'warroom-google-auth', 'width=520,height=640')
-      }
-      return
-    }
+    if (handleConnection(res)) return
     if (res.success) {
-      setText('')
       setDocUrl('')
+      setDocs(null)
     } else if (res.error === 'upgrade_required') setNeedsUpgrade(true)
+    else setSubmitError(res.error ?? 'import failed')
+  }
+
+  async function start() {
+    const input = source === 'paste' ? text.trim() : docUrl.trim()
+    if (!input || running || submitting) return
+    if (source === 'gdoc') return importDoc({ url: docUrl })
+    setSubmitting(true)
+    setSubmitError(null)
+    setNeedsUpgrade(false)
+    setConnecting(false)
+    // the action checks membership + free quota + Pro entitlement
+    // server-side, then enqueues the job; progress streams back via useJobs
+    const res = await callAction('start-import', {
+      roomId,
+      text,
+      mode,
+      userName: user?.fullName ?? '',
+    })
+    setSubmitting(false)
+    if (res.success) setText('')
+    else if (res.error === 'upgrade_required') setNeedsUpgrade(true)
     else setSubmitError(res.error ?? 'import failed')
   }
 
@@ -113,10 +150,40 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
             />
           ) : (
             <>
+              {docs === null ? (
+                <button
+                  onClick={browseDocs}
+                  disabled={browsing}
+                  className="wire mt-3 rounded-sm border border-border px-3 py-3 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-50"
+                >
+                  {browsing ? 'FETCHING YOUR DOCS…' : 'BROWSE YOUR GOOGLE DOCS'}
+                </button>
+              ) : (
+                <div className="mt-3 flex max-h-64 flex-col gap-1 overflow-y-auto">
+                  {docs.map((d) => (
+                    <button
+                      key={d.id}
+                      onClick={() => importDoc({ docId: d.id })}
+                      disabled={submitting}
+                      className="flex items-baseline justify-between gap-2 rounded-sm border border-border px-3 py-2.5 text-left hover:border-chrome disabled:opacity-50"
+                    >
+                      <span className="truncate text-[13px] text-foreground">{d.title}</span>
+                      {d.modified && (
+                        <span className="wire flex-none text-[10px] text-chrome/70">
+                          {new Date(d.modified).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                        </span>
+                      )}
+                    </button>
+                  ))}
+                  <button onClick={browseDocs} className="wire mt-1 self-start text-chrome hover:text-foreground">
+                    REFRESH
+                  </button>
+                </div>
+              )}
               <input
                 value={docUrl}
                 onChange={(e) => setDocUrl(e.target.value)}
-                placeholder="https://docs.google.com/document/d/…"
+                placeholder="…or paste a doc link: docs.google.com/document/d/…"
                 className="mt-3 rounded-sm border border-border bg-background p-3 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-chrome"
               />
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
@@ -127,7 +194,7 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
                 <div className="mt-3 rounded-sm border border-live/40 p-3">
                   <div className="wire text-live">FINISH CONNECTING IN THE POPUP</div>
                   <p className="mt-1 text-xs text-muted-foreground">
-                    Approve Google Docs access, then press Import again.
+                    Approve Google Docs access, then try again.
                   </p>
                 </div>
               )}

@@ -21,7 +21,12 @@ import type { AppActionTools } from '../server/action-routes'
 import { checkQuotaAndEnqueue } from './imports'
 
 const TOOLKIT = 'googledocs'
+// Both slugs verified against prod via list-gdocs { discover: true } (D-020).
+// ponytail: GOOGLEDOCS_GET_DOCUMENT_PLAINTEXT exists and would replace the
+// JSON body walker — switch if the walker ever misses content; the current
+// path is live-verified (B-002), so it stays.
 const GET_DOC_TOOL = 'GOOGLEDOCS_GET_DOCUMENT_BY_ID'
+const SEARCH_DOCS_TOOL = 'GOOGLEDOCS_SEARCH_DOCUMENTS' // args: query, max_results, order_by, …
 
 type ComposioEnvelope = {
   requiresConnection?: boolean
@@ -39,7 +44,9 @@ export const importGoogleDoc: ActionHandler<Env> = async ({ userId, params, tool
   const mode = params.mode === 'key-points' ? 'key-points' : 'cards'
   const userName = typeof params.userName === 'string' ? params.userName.slice(0, 80) : ''
 
-  const docId = extractDocId(url)
+  // picker sends a bare docId; the paste fallback sends a url
+  const docId =
+    typeof params.docId === 'string' && params.docId ? params.docId : extractDocId(url)
   if (!roomId || !docId) {
     return { success: false, error: 'paste a Google Docs link (docs.google.com/document/d/…)' }
   }
@@ -86,6 +93,110 @@ export function shapeOf(v: unknown, depth = 0): string {
   const keys = Object.keys(v).slice(0, 12)
   if (depth >= 2) return `{${keys.join(',')}}`
   return `{${keys.map((k) => `${k}:${shapeOf((v as Record<string, unknown>)[k], depth + 1)}`).join(',')}}`
+}
+
+/**
+ * list-gdocs — the doc picker's data. Lists the calling user's recent Google
+ * Docs (optionally filtered by a search query) via their own connection.
+ * `{ discover: true }` instead returns the toolkit's tool catalog — the
+ * self-diagnosing mode that lets slugs be verified against prod without
+ * guessing (the B-002 lesson).
+ */
+export const listGoogleDocs: ActionHandler<Env> = async ({ params, tools }) => {
+  const t = tools as AppActionTools
+
+  if (params.discover === true) {
+    const res = await t.integration<unknown>('composio/list-tools', {
+      toolkit: TOOLKIT,
+      limit: 50,
+    })
+    if (!res.success) return { success: false, error: res.error ?? 'discovery failed' }
+    return { success: true, data: { shape: shapeOf(res.data), catalog: summarizeCatalog(res.data) } }
+  }
+
+  const query = typeof params.query === 'string' ? params.query.slice(0, 100) : ''
+  const res = await t.integration<ComposioEnvelope>('composio/execute-tool', {
+    slug: SEARCH_DOCS_TOOL,
+    arguments: { max_results: 25, ...(query ? { query } : {}) },
+  })
+  if (!res.success) return { success: false, error: res.error ?? 'doc list failed' }
+
+  const payload = (res.data ?? {}) as ComposioEnvelope
+  const consentUrl = payload.redirectUrl ?? payload.authUrl
+  if (payload.requiresConnection) {
+    if (consentUrl) return { success: true, data: { needsConnection: true, redirectUrl: consentUrl } }
+    const init = await t.integration<ComposioEnvelope>('composio/initiate-connection', { toolkit: TOOLKIT })
+    const initUrl = ((init.data ?? {}) as ComposioEnvelope).redirectUrl
+    if (init.success && initUrl) {
+      return { success: true, data: { needsConnection: true, redirectUrl: initUrl } }
+    }
+    return { success: false, error: 'could not start the Google connection' }
+  }
+
+  const docs = extractDocList(payload)
+  if (docs.length === 0) {
+    return { success: false, error: `no documents found (shape: ${shapeOf(payload)})` }
+  }
+  return { success: true, data: { docs } }
+}
+
+export type GDocListing = { id: string; title: string; modified?: string }
+
+/**
+ * Pull {id, title} pairs out of whatever list shape comes back — B-002 taught
+ * us not to bet on one nesting, so this walks for objects that look like doc
+ * records wherever they sit.
+ */
+export function extractDocList(payload: unknown): GDocListing[] {
+  const out: GDocListing[] = []
+  const seen = new Set<string>()
+  walkForDocs(payload, out, seen, 0)
+  return out.slice(0, 25)
+}
+
+function walkForDocs(v: unknown, out: GDocListing[], seen: Set<string>, depth: number) {
+  if (!v || typeof v !== 'object' || depth > 5) return
+  if (Array.isArray(v)) {
+    for (const item of v) walkForDocs(item, out, seen, depth + 1)
+    return
+  }
+  const o = v as Record<string, unknown>
+  const id =
+    (typeof o.documentId === 'string' && o.documentId) ||
+    (typeof o.id === 'string' && o.id) ||
+    null
+  const title =
+    (typeof o.title === 'string' && o.title) ||
+    (typeof o.name === 'string' && o.name) ||
+    null
+  if (id && title) {
+    if (!seen.has(id)) {
+      seen.add(id)
+      const modified = typeof o.modifiedTime === 'string' ? o.modifiedTime : undefined
+      out.push({ id, title, modified })
+    }
+    return
+  }
+  for (const val of Object.values(o)) walkForDocs(val, out, seen, depth + 1)
+}
+
+function summarizeCatalog(data: unknown): Array<{ slug?: string; args?: string[] }> {
+  const items: Array<{ slug?: string; args?: string[] }> = []
+  const walk = (v: unknown, depth: number) => {
+    if (!v || typeof v !== 'object' || depth > 4 || items.length > 60) return
+    if (Array.isArray(v)) return v.forEach((x) => walk(x, depth + 1))
+    const o = v as Record<string, unknown>
+    if (typeof o.slug === 'string') {
+      const props =
+        (o.inputParameters as Record<string, unknown> | undefined)?.properties ??
+        (o.input_parameters as Record<string, unknown> | undefined)?.properties
+      items.push({ slug: o.slug, args: props ? Object.keys(props).slice(0, 10) : undefined })
+      return
+    }
+    Object.values(o).forEach((x) => walk(x, depth + 1))
+  }
+  walk(data, 0)
+  return items
 }
 
 export function extractDocId(url: string): string | null {

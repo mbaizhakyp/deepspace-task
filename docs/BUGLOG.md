@@ -105,6 +105,13 @@ Decision: the summary stays one synchronous action call; the panel now shows an 
 Why: the summary is a single ~5–15s AI call — there is no intermediate state to report; converting it to a JobRoom job buys real progress only if summaries ever become multi-step (upgrade path noted in code).
 Beats: fake percentage bars (dishonest) and a job conversion now (cost without new information).
 
+## D-020 · Google Docs picker, discovery-first (B-002 confirmed by user)
+When: 2026-08-31 (user confirmed the B-002 fix live, then asked for a picker)
+Decision: the Google Doc tab now leads with "BROWSE YOUR GOOGLE DOCS" — a picker listing the caller's recent docs (`GOOGLEDOCS_SEARCH_DOCUMENTS` on their own connection), click-to-import; the paste-a-link field stays as fallback. Tool slugs were NOT guessed this time: `list-gdocs { discover: true }` calls `composio/list-tools` and returns the toolkit's real catalog — the search slug + arg names were verified against production before the picker went live. The listing parser walks for {id,title} pairs at any nesting (the B-002 lesson, generalized) with a unit test.
+Why: paste-a-URL made users do the app's job (open Drive, hunt, copy, return); discovery mode turns future slug/shape surprises into a one-call diagnosis.
+Beats: guessing the search slug (B-002 déjà vu) and replacing the paste fallback (covers docs the listing misses).
+Found in discovery, noted for later: `GOOGLEDOCS_GET_DOCUMENT_PLAINTEXT` could replace the JSON body walker; not switched — the current fetch path is live-verified.
+
 ## D-001 · No video/audio calls
 When: planning
 Decision: presence (avatars + live cursors) carries the "we're together" feeling; no LiveKit.

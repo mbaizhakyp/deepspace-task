@@ -63,6 +63,30 @@ describe('extractDocText (Google Docs resource, real shape from B-002)', () => {
   })
 })
 
+describe('extractDocList (picker: doc listings in unknown nesting)', () => {
+  it('finds id+title pairs wherever they sit, dedupes, tolerates junk', async () => {
+    const { extractDocList } = await import('./actions/google-docs')
+    const payload = {
+      response_data: {
+        documents: [
+          { documentId: 'a', title: 'Plan', modifiedTime: '2026-08-30T00:00:00Z' },
+          { id: 'b', name: 'Notes' },
+          { documentId: 'a', title: 'Plan (dup)' },
+          { noise: true },
+        ],
+      },
+    }
+    const docs = extractDocList(payload)
+    expect(docs.map((d) => d.id)).toEqual(['a', 'b'])
+    expect(docs[0].title).toBe('Plan')
+  })
+  it('returns [] for garbage', async () => {
+    const { extractDocList } = await import('./actions/google-docs')
+    expect(extractDocList(undefined)).toEqual([])
+    expect(extractDocList('nope')).toEqual([])
+  })
+})
+
 describe('parseMemberIds (stored membership json)', () => {
   it('accepts arrays and JSON strings', () => {
     expect(parseMemberIds(['a', 'b'])).toEqual(['a', 'b'])
