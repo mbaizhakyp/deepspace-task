@@ -17,5 +17,8 @@
 
 export const integrations: Record<string, { billing: 'developer' | 'user' }> = {
   google: { billing: 'user' },
-  // openai: { billing: 'developer' },
+  // composio acts on the CALLING user's connected account — must be
+  // user-billed so the api-worker keys the OAuth row to the caller's JWT
+  composio: { billing: 'user' },
+  // anthropic (imports, summaries) stays developer-billed: the app pays
 }

@@ -25,6 +25,20 @@ export const startImport: ActionHandler<Env> = async ({ userId, params, tools, e
   const userName = typeof params.userName === 'string' ? params.userName.slice(0, 80) : ''
   if (!roomId || !text.trim()) return { success: false, error: 'roomId and text required' }
 
+  return checkQuotaAndEnqueue(t, env, callerJwt, { userId, roomId, text, mode, userName })
+}
+
+/**
+ * Shared gate for every import source (paste, Google Doc): membership,
+ * free quota, Pro entitlement, then a `verified:` enqueue.
+ */
+export async function checkQuotaAndEnqueue(
+  t: AppActionTools,
+  env: Env,
+  callerJwt: string,
+  args: { userId: string; roomId: string; text: string; mode: 'cards' | 'key-points'; userName: string },
+): Promise<{ success: true; data: { jobId: string } } | { success: false; error: string }> {
+  const { userId, roomId, text, mode, userName } = args
   const roomRes = await t.get<RoomData>('rooms', roomId)
   const room = roomRes.success ? roomRes.data?.record?.data : undefined
   if (!room) return { success: false, error: 'room not found' }

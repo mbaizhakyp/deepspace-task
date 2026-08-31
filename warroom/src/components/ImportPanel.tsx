@@ -16,31 +16,52 @@ type ImportResult = { created?: number }
 export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () => void }) {
   const { user } = useAuthUser()
   const { jobs, connected } = useJobs<ImportPayload, ImportResult>(`board:${roomId}`)
+  const [source, setSource] = useState<'paste' | 'gdoc'>('paste')
   const [text, setText] = useState('')
+  const [docUrl, setDocUrl] = useState('')
   const [mode, setMode] = useState<'cards' | 'key-points'>('cards')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
   const [needsUpgrade, setNeedsUpgrade] = useState(false)
+  const [connecting, setConnecting] = useState(false)
 
   const current = jobs.find((j) => j.type === 'import-text')
   const running = current?.status === 'queued' || current?.status === 'running'
 
   async function start() {
-    if (!text.trim() || running || submitting) return
+    const input = source === 'paste' ? text.trim() : docUrl.trim()
+    if (!input || running || submitting) return
     setSubmitting(true)
     setSubmitError(null)
     setNeedsUpgrade(false)
-    // start-import checks membership + the free quota + Pro entitlement
-    // server-side, then enqueues the job; progress streams back via useJobs
-    const res = await callAction('start-import', {
-      roomId,
-      text,
-      mode,
-      userName: user?.fullName ?? '',
-    })
+    setConnecting(false)
+    // both actions check membership + free quota + Pro entitlement
+    // server-side, then enqueue the job; progress streams back via useJobs
+    const res =
+      source === 'paste'
+        ? await callAction('start-import', { roomId, text, mode, userName: user?.fullName ?? '' })
+        : await callAction<{ needsConnection?: boolean; redirectUrl?: string }>('import-gdoc', {
+            roomId,
+            url: docUrl,
+            mode,
+            userName: user?.fullName ?? '',
+          })
     setSubmitting(false)
-    if (res.success) setText('')
-    else if (res.error === 'upgrade_required') setNeedsUpgrade(true)
+    const connection = res.success
+      ? (res.data as { needsConnection?: boolean; redirectUrl?: string } | undefined)
+      : undefined
+    if (connection?.needsConnection) {
+      // the requiresConnection dance: open Google's consent, then retry
+      setConnecting(true)
+      if (typeof connection.redirectUrl === 'string') {
+        window.open(connection.redirectUrl, 'warroom-google-auth', 'width=520,height=640')
+      }
+      return
+    }
+    if (res.success) {
+      setText('')
+      setDocUrl('')
+    } else if (res.error === 'upgrade_required') setNeedsUpgrade(true)
     else setSubmitError(res.error ?? 'import failed')
   }
 
@@ -72,12 +93,46 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
         </div>
       ) : (
         <>
-          <textarea
-            value={text}
-            onChange={(e) => setText(e.target.value)}
-            placeholder="Paste anything — a tidy doc, messy meeting notes, a transcript. Headings are a hint, not a requirement."
-            className="mt-4 min-h-52 flex-none resize-none rounded-sm border border-border bg-background p-3 text-[13px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-chrome"
-          />
+          <div className="mt-4 flex gap-1 rounded-sm border border-border p-1">
+            {(['paste', 'gdoc'] as const).map((s) => (
+              <button
+                key={s}
+                onClick={() => setSource(s)}
+                className={`wire flex-1 rounded-[2px] px-2 py-1.5 ${source === s ? 'bg-accent text-foreground' : 'text-chrome hover:text-foreground'}`}
+              >
+                {s === 'paste' ? 'PASTE TEXT' : 'GOOGLE DOC'}
+              </button>
+            ))}
+          </div>
+          {source === 'paste' ? (
+            <textarea
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder="Paste anything — a tidy doc, messy meeting notes, a transcript. Headings are a hint, not a requirement."
+              className="mt-3 min-h-48 flex-none resize-none rounded-sm border border-border bg-background p-3 text-[13px] leading-relaxed text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-chrome"
+            />
+          ) : (
+            <>
+              <input
+                value={docUrl}
+                onChange={(e) => setDocUrl(e.target.value)}
+                placeholder="https://docs.google.com/document/d/…"
+                className="mt-3 rounded-sm border border-border bg-background p-3 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-chrome"
+              />
+              <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
+                Fetched from your own Google account — you approve access once, we never see your
+                password.
+              </p>
+              {connecting && (
+                <div className="mt-3 rounded-sm border border-live/40 p-3">
+                  <div className="wire text-live">FINISH CONNECTING IN THE POPUP</div>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Approve Google Docs access, then press Import again.
+                  </p>
+                </div>
+              )}
+            </>
+          )}
           <div className="mt-4 flex flex-col gap-2">
             <ModeRadio
               checked={mode === 'cards'}
@@ -94,10 +149,10 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
           </div>
           <button
             onClick={start}
-            disabled={!text.trim() || !connected || submitting}
+            disabled={(source === 'paste' ? !text.trim() : !docUrl.trim()) || !connected || submitting}
             className="mt-5 rounded-sm bg-primary px-4 py-2.5 text-[13px] font-semibold text-primary-foreground disabled:opacity-40"
           >
-            Import to the board
+            {submitting ? 'Starting…' : 'Import to the board'}
           </button>
           {needsUpgrade && (
             <div className="mt-3 rounded-sm border border-primary/50 p-3">

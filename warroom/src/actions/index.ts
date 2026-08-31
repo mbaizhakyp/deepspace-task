@@ -3,6 +3,7 @@ import type { Env } from '../../worker'
 import { createRoom, joinRoom, setFreeze } from './rooms'
 import { summarize } from './summarize'
 import { startImport } from './imports'
+import { importGoogleDoc } from './google-docs'
 
 export const actions: Record<string, ActionHandler<Env>> = {
   'create-room': createRoom,
@@ -10,4 +11,5 @@ export const actions: Record<string, ActionHandler<Env>> = {
   'set-freeze': setFreeze,
   summarize,
   'start-import': startImport,
+  'import-gdoc': importGoogleDoc,
 }
