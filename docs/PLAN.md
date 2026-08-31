@@ -10,17 +10,16 @@
 
 **Spec:** `docs/REQUIREMENTS.md` (this plan argues from it). Design: `design-brief.md`.
 
-## STATUS (2026-08-30, evening — user away)
+## STATUS (2026-08-30, night — SHIPPED)
 
-Built and compile-verified (tsc + eslint green), commits `stage 0..10`:
-tasks 0–4, 6–10 code-complete. **Nothing runtime-verified yet — B-001 (app
-quota) blocks dev/test/deploy/unit-vitest until the user decides.**
+**Live at https://warroomhq.app.space.** All stages complete and verified:
+8 unit + 11 Playwright tests green (incl. the two-user server-enforced-freeze
+spec), scripted prod E2E (sign-in → room → real AI import, 9 cards → poll →
+summary) with screenshots in docs/screenshots/. Writeup: docs/SUBMISSION.md.
 
-Queued behind B-001, in order: `app init` → commit real app id → `dev start`
-→ two-window checks (cards, cursors, polls, freeze enforcement incl. direct
-WS attempt) → import E2E (paste, then Google via Composio — needs user's
-Google consent; verify tool slugs, B-002) → seed demo room → `test run all`
-→ security review → deploy → SUBMISSION.md.
+Open items (need the user): live-verify Google Docs OAuth (B-002, one consent
+click); optional Stripe Connect onboarding for real checkout; submit in the
+portal.
 
 ## Global Constraints
 
