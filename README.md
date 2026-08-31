@@ -2,7 +2,7 @@
 
 **A war room, not a call. The meeting is the artifact.**
 
-Live: **https://warroomhq.app.space** · Demo room: [Q3 Launch Plan](https://warroomhq.app.space/room/1788143028086_ncph5b)
+Live: **https://warroomhq.app.space** — sign in, open a room, paste a messy doc into IMPORT, and open the room's link in a second window.
 
 Import a document — tidy or messy — and it lands on a shared board as live cards. Triage together with presence cursors, settle contested points with live polls, let the facilitator freeze the room (server-enforced), and leave with an AI dispatch of what was decided.
 

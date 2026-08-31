@@ -1,8 +1,9 @@
 # Warroom — submission note
 
 **Live:** https://warroomhq.app.space
-**Demo room (join as any signed-in user):** https://warroomhq.app.space/room/1788143028086_ncph5b
 **Repo:** github.com/mbaizhakyp/deepspace-task (app in `warroom/`; process docs in `docs/`)
+
+Sixty-second demo: sign in → open a room → IMPORT → paste any text (messy notes work best) → watch cards land → open a poll → Summarize. Two browser windows on the same room link is the full effect.
 
 ## What it is
 
