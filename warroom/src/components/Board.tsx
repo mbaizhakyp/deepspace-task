@@ -10,6 +10,7 @@ import { getUserColor, useAuthUser, useMutations, usePresenceRoom, useQuery } fr
 import { Button, Input, Modal, Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
 import { PollCard, type PollData } from './PollCard'
+import { ImportPanel } from './ImportPanel'
 
 export type CardData = {
   title: string
@@ -43,6 +44,7 @@ export default function Board({
   const pollMutations = useMutations<PollData>('polls')
   const eventMutations = useMutations<EventData>('events')
   const [pollDialogOpen, setPollDialogOpen] = useState(false)
+  const [importOpen, setImportOpen] = useState(false)
   const { warning } = useToast()
 
   const settings = settingsRecords[0]?.data
@@ -163,6 +165,13 @@ export default function Board({
           </button>
         )}
         <button
+          onClick={() => setImportOpen((v) => !v)}
+          disabled={locked}
+          className={`wire rounded-sm border px-3 py-2 disabled:opacity-50 ${importOpen ? 'border-primary text-primary' : 'border-border text-chrome hover:border-chrome hover:text-foreground'}`}
+        >
+          IMPORT
+        </button>
+        <button
           onClick={() => setPollDialogOpen(true)}
           disabled={!pollMutations.ready || locked}
           className="wire rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-50"
@@ -192,7 +201,8 @@ export default function Board({
         />
       )}
 
-      {/* board field */}
+      {/* board field + optional import panel */}
+      <div className="flex min-h-0 flex-1">
       <div
         ref={fieldRef}
         className={`dotgrid relative flex-1 overflow-auto ${frozen ? 'brightness-[.85]' : ''}`}
@@ -258,6 +268,9 @@ export default function Board({
             </div>
           ))}
         </div>
+      </div>
+
+      {importOpen && <ImportPanel roomId={roomId} onClose={() => setImportOpen(false)} />}
       </div>
 
       {/* frozen chrome */}
