@@ -28,6 +28,11 @@ Symptom: registration refused; existing app `forever-dolly` (app_01M0YF3SGMNED4W
 Impact: `dev start`, `test run`, `deploy` all blocked until resolved — and (found at stage 10) even `npm run test:unit` is blocked: vitest.config.ts calls `appIdDefine`, which refuses the `__APP_ID__` placeholder in wrangler.toml. Building continues compile-only (tsc + eslint green through stage 10); every runtime check is queued in PLAN under "verify once dev runs".
 User decision required (CLI ships no action on purpose): (a) free the slot — `npx deepspace app undeploy app_01M0YF3SGMNED4W2NNVJ49V8P3 --yes` (removes that deployed app!) — or (b) upgrade the plan. I will not undeploy without explicit say-so.
 
+## B-002 · Composio Google Docs tool slugs unverified · OPEN
+When: stage 7 · Where: `src/actions/google-docs.ts`
+Symptom: none yet — preemptive. `TOOLKIT='googledocs'` and `GET_DOC_TOOL='GOOGLEDOCS_GET_DOCUMENT_BY_ID'` follow Composio's published naming but tool discovery (`composio/list-tools`) is a runtime call blocked by B-001.
+Fix path: on first live run, call list-tools filtered to the googledocs toolkit and correct the constants if they differ; also verify the doc-JSON shape against `extractDocText`'s walker.
+
 ## D-001 · No video/audio calls
 When: planning
 Decision: presence (avatars + live cursors) carries the "we're together" feeling; no LiveKit.

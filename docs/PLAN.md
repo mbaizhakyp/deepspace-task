@@ -10,6 +10,18 @@
 
 **Spec:** `docs/REQUIREMENTS.md` (this plan argues from it). Design: `design-brief.md`.
 
+## STATUS (2026-08-30, evening — user away)
+
+Built and compile-verified (tsc + eslint green), commits `stage 0..10`:
+tasks 0–4, 6–10 code-complete. **Nothing runtime-verified yet — B-001 (app
+quota) blocks dev/test/deploy/unit-vitest until the user decides.**
+
+Queued behind B-001, in order: `app init` → commit real app id → `dev start`
+→ two-window checks (cards, cursors, polls, freeze enforcement incl. direct
+WS attempt) → import E2E (paste, then Google via Composio — needs user's
+Google consent; verify tool slugs, B-002) → seed demo room → `test run all`
+→ security review → deploy → SUBMISSION.md.
+
 ## Global Constraints
 
 - Timebox ~8h build; when a task overruns, cut per REQUIREMENTS priority and log in BUGLOG.
