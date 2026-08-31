@@ -7,7 +7,7 @@
 
 import { useRef, useState } from 'react'
 import { getUserColor, useAuthUser, useMutations, usePresenceRoom, useQuery } from 'deepspace'
-import { Button, Input, Modal, Textarea, useToast } from '@/components/ui'
+import { Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
 import { PollCard, type PollData } from './PollCard'
 import { ImportPanel } from './ImportPanel'
@@ -195,9 +195,13 @@ export default function Board({
         >
           NEW POLL
         </button>
-        <Button size="sm" onClick={addCard} disabled={!ready || locked}>
-          Add card
-        </Button>
+        <button
+          onClick={addCard}
+          disabled={!ready || locked}
+          className="wire rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-50"
+        >
+          ADD CARD
+        </button>
         <button
           onClick={() => setPanel(panel === 'summary' ? 'none' : 'summary')}
           className="rounded-sm bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground"

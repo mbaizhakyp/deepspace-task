@@ -1,4 +1,4 @@
-name = "warroom"
+name = "warroomhq"
 compatibility_date = "2025-01-01"
 compatibility_flags = ["nodejs_compat", "assets_navigation_has_no_effect"]
 main = "worker.ts"

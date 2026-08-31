@@ -24,7 +24,7 @@ test('war room: live sync, one-vote polls, server-enforced freeze', async ({ use
   const roomPath = new URL(a.page.url()).pathname
 
   // ── A adds a card; B joins and sees it (server→B sync) ─────────────
-  await a.page.getByRole('button', { name: 'Add card' }).click()
+  await a.page.getByRole('button', { name: 'ADD CARD' }).click()
   await expect(a.page.getByText('Double-click to write')).toBeVisible({ timeout: 10_000 })
 
   await b.page.goto(roomPath)
@@ -48,7 +48,7 @@ test('war room: live sync, one-vote polls, server-enforced freeze', async ({ use
   // ── A freezes; B sees the banner arrive over sync ───────────────────
   await a.page.getByRole('button', { name: 'FREEZE', exact: true }).click()
   await expect(b.page.getByTestId('frozen-banner')).toBeVisible({ timeout: 10_000 })
-  await expect(b.page.getByRole('button', { name: 'Add card' })).toBeDisabled()
+  await expect(b.page.getByRole('button', { name: 'ADD CARD' })).toBeDisabled()
 
   // ── THE server-enforcement proof ────────────────────────────────────
   // B pushes a raw core.put through its own live socket via the dev hook.
