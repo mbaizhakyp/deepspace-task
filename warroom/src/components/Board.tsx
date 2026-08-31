@@ -48,6 +48,7 @@ export default function Board({
   const { records: polls } = useQuery<PollData>('polls', {})
   const { create, put, remove, ready } = useMutations<CardData>('cards')
   const pollMutations = useMutations<PollData>('polls')
+  const voteMutations = useMutations<{ pollId: string; voterId: string; optionIndex: number }>('votes')
   const eventMutations = useMutations<EventData>('events')
   const [pollDialogOpen, setPollDialogOpen] = useState(false)
   const [panel, setPanel] = useState<'none' | 'import' | 'summary'>('none')
@@ -135,6 +136,10 @@ export default function Board({
     ;(window as unknown as Record<string, unknown>).__warroomTest = {
       putCard: (id: string, patch: Record<string, unknown>) => put(id, patch as Partial<CardData>),
       cards: cards.map((c) => ({ id: c.recordId, x: c.data.x, y: c.data.y })),
+      polls: polls.map((p) => ({ id: p.recordId, status: p.data.status })),
+      putPoll: (id: string, patch: Record<string, unknown>) => pollMutations.put(id, patch as Partial<PollData>),
+      createVote: (data: Record<string, unknown>) =>
+        voteMutations.create(data as { pollId: string; voterId: string; optionIndex: number }),
     }
   }
 
@@ -245,7 +250,9 @@ export default function Board({
             dragPos={drag?.id === c.recordId ? { x: drag.x, y: drag.y } : null}
             shake={shakeId === c.recordId}
             locked={locked}
-            canDelete={!locked && ready}
+            // mirror the server rule (delete: 'own') — showing × on cards the
+            // DO would refuse to delete is client-side theater
+            canDelete={!locked && ready && c.createdBy === user?.id}
             onPointerDown={(e) => startDrag(e, c.recordId, 'card', c.data.x, c.data.y)}
             onSave={(patch) => put(c.recordId, patch as Partial<CardData>)}
             onDelete={() => remove(c.recordId)}

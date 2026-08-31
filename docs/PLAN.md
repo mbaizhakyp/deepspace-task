@@ -1,6 +1,12 @@
 # Warroom Implementation Plan
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:executing-plans (inline execution — timeboxed solo build; subagent-per-task overhead not justified). Steps use checkbox (`- [ ]`) syntax for tracking.
+> *(`superpowers:executing-plans` is the agent workflow skill this plan was executed with — an internal tooling note, not part of the product.)*
+
+> **Historical document.** This is the plan as written BEFORE the build. Task sketches show pre-build thinking; where the implementation diverged after contact with the SDK, the divergence is deliberate and recorded in `docs/BUGLOG.md`:
+> - Task 2's `members`/`jobs` collections → dropped (D-012 membership on the room record; D-010 platform JobRoom)
+> - Task 4's deterministic vote id → replaced by `userBound` voterId + `uniqueOn` + `update:'own'` (stronger: DB-level, unforgeable)
+> - Task 5's role-flip freeze sketch → replaced by DO message interception (D-008: no authorize hook on RecordRoom, and role flips don't cover mid-freeze joiners)
+> - Poll close moved from a server action to schema-update + a DO lifecycle guard (creator/facilitator close; facilitator-only reopen — B-006)
 
 **Goal:** Ship a deployed collaborative war-room app (rooms → live cards → polls → freeze → AI import/summary) on DeepSpace within the 6–8h exercise timebox.
 
@@ -37,7 +43,7 @@ portal.
 **Files:** Create `CLAUDE.md`, `docs/REQUIREMENTS.md`, `docs/PLAN.md`, `docs/BUGLOG.md`, `.gitignore` (examples/, scratchpad, node_modules, .env*, test artifacts).
 
 - [x] Write the four documents
-- [ ] `git add` + commit `stage 0: project docs, requirements, plan, bug log`
+- [x] `git add` + commit `stage 0: project docs, requirements, plan, bug log`
 
 ### Task 1: Preflight + scaffold
 
@@ -45,12 +51,12 @@ portal.
 
 **Interfaces produced:** running scaffold app on a dev port; catalog facts recorded in BUGLOG (composio endpoints for Google Docs; anthropic endpoint name; payments availability).
 
-- [ ] `npx deepspace auth whoami --json` — if signed out: **STOP, flag to user** (browser OAuth is theirs to do)
-- [ ] `npm create deepspace@latest warroom` (registration mints on first dev start — verify account first)
-- [ ] `npx deepspace add --list` and `integrations info composio/execute-tool`, `integrations info anthropic/chat-completion` — record exact endpoint shapes in BUGLOG
-- [ ] `cd warroom && npx deepspace dev start` — confirm scaffold boots; note the port
-- [ ] Read scaffolded `worker.ts` + `src/schemas.ts`; diff mental model against taskspace; adjust plan if the scaffold's shape differs (log any surprise)
-- [ ] Commit `stage 1: deepspace scaffold boots`
+- [x] `npx deepspace auth whoami --json` — if signed out: **STOP, flag to user** (browser OAuth is theirs to do)
+- [x] `npm create deepspace@latest warroom` (registration mints on first dev start — verify account first)
+- [x] `npx deepspace add --list` and `integrations info composio/execute-tool`, `integrations info anthropic/chat-completion` — record exact endpoint shapes in BUGLOG
+- [x] `cd warroom && npx deepspace dev start` — confirm scaffold boots; note the port
+- [x] Read scaffolded `worker.ts` + `src/schemas.ts`; diff mental model against taskspace; adjust plan if the scaffold's shape differs (log any surprise)
+- [x] Commit `stage 1: deepspace scaffold boots`
 
 ### Task 2: Schemas + worker wiring (the data contract)
 
@@ -67,10 +73,10 @@ portal.
   - `jobs`: read all roles; writes server-action only
 - Worker: `AppRecordRoom extends RecordRoom` fed all schemas; `PresenceRoom` wired; roomId pattern `board:<id>`.
 
-- [ ] Write schema files (copy taskspace's `CollectionSchema` shape; roles named `facilitator/editor/frozen` mapped onto the SDK's role slots — verify against permissions docs first: fetch `docs.deep.space/concepts/permissions.md`)
-- [ ] Wire into `worker.ts`
-- [ ] Check: `npx deepspace test run` (scaffold suite still green) + boot dev, confirm no schema errors in logs
-- [ ] Commit `stage 2: data model + RBAC matrix`
+- [x] Write schema files (copy taskspace's `CollectionSchema` shape; roles named `facilitator/editor/frozen` mapped onto the SDK's role slots — verify against permissions docs first: fetch `docs.deep.space/concepts/permissions.md`)
+- [x] Wire into `worker.ts`
+- [x] Check: `npx deepspace test run` (scaffold suite still green) + boot dev, confirm no schema errors in logs
+- [x] Commit `stage 2: data model + RBAC matrix`
 
 ### Task 3: Rooms + board + presence (first demoable core)
 
@@ -78,22 +84,22 @@ portal.
 
 **Interfaces produced:** `useRoomData(roomId)` hook wrapping `useQuery`/`useMutations` for board collections; join-room server action (creates member record with Role editor, facilitator for creator).
 
-- [ ] Lobby: my rooms (query `rooms` where member), create room (creates room record + own member record via server action), join by URL
-- [ ] Board: render cards from query; add card; drag = `put(id, {X,Y})`; edit title/body inline; delete own
-- [ ] Presence: scaffold presence room → avatar stack, `n PRESENT`, live cursors (throttle ~60ms)
-- [ ] **Two-window check (manual):** card added/moved in window A appears live in window B; cursors visible
-- [ ] Commit `stage 3: rooms, live board, presence`
+- [x] Lobby: my rooms (query `rooms` where member), create room (creates room record + own member record via server action), join by URL
+- [x] Board: render cards from query; add card; drag = `put(id, {X,Y})`; edit title/body inline; delete own
+- [x] Presence: scaffold presence room → avatar stack, `n PRESENT`, live cursors (throttle ~60ms)
+- [x] **Two-window check (manual):** card added/moved in window A appears live in window B; cursors visible
+- [x] Commit `stage 3: rooms, live board, presence`
 
 ### Task 4: Polls
 
 **Files:** Create `warroom/src/components/PollCard.tsx`, `src/actions/close-poll.ts`; modify `Board.tsx`.
 
-- [ ] Create-poll UI (question + 2–4 options) → poll record
-- [ ] Vote: `create('votes', {...}, `${pollId}:${userId}`)` — deterministic id makes revote an overwrite. **One runnable check:** vote twice as same user, assert one vote record
-- [ ] Live bars (percentage of votes per option), counts, `n VOTED` mono line
-- [ ] Close (creator/facilitator via server action → Status closed, ClosedAt); closed render state per design (winner orange, loser gray)
-- [ ] Two-window check: vote in A, bar moves in B
-- [ ] Commit `stage 4: live polls with one-vote-per-user`
+- [x] Create-poll UI (question + 2–4 options) → poll record
+- [x] Vote: `create('votes', {...}, `${pollId}:${userId}`)` — deterministic id makes revote an overwrite. **One runnable check:** vote twice as same user, assert one vote record
+- [x] Live bars (percentage of votes per option), counts, `n VOTED` mono line
+- [x] Close (creator/facilitator via server action → Status closed, ClosedAt); closed render state per design (winner orange, loser gray)
+- [x] Two-window check: vote in A, bar moves in B
+- [x] Commit `stage 4: live polls with one-vote-per-user`
 
 ### Task 5: Facilitator freeze (the permission showpiece)
 
@@ -115,10 +121,10 @@ for (const m of all.data.records) {
 await tools.update('rooms', roomId, { FrozenBy: frozen ? userId : null })
 ```
 
-- [ ] Implement action + FREEZE/UNFREEZE header toggle (facilitator only)
-- [ ] Frozen UI: board dim, orange viewport border, `BOARD FROZEN BY <NAME>` banner, write controls disabled, drag attempt shake
-- [ ] **Enforcement check (the one that matters):** while frozen, fire a card mutation from window B (or direct API call) → server refuses. Playwright two-user spec if the scaffold's multi-user fixture makes it cheap; manual + logged evidence otherwise
-- [ ] Commit `stage 5: server-enforced facilitator freeze`
+- [x] Implement action + FREEZE/UNFREEZE header toggle (facilitator only)
+- [x] Frozen UI: board dim, orange viewport border, `BOARD FROZEN BY <NAME>` banner, write controls disabled, drag attempt shake
+- [x] **Enforcement check (the one that matters):** while frozen, fire a card mutation from window B (or direct API call) → server refuses. Playwright two-user spec if the scaffold's multi-user fixture makes it cheap; manual + logged evidence otherwise
+- [x] Commit `stage 5: server-enforced facilitator freeze`
 
 ### Task 6: Import v1 — paste text, AI segmentation, background job
 
@@ -126,52 +132,52 @@ await tools.update('rooms', roomId, { FrozenBy: frozen ? userId : null })
 
 **Flow:** action creates `jobs` record (running, Total unknown→n) → calls `anthropic/chat-completion` via `tools.integration` asking for JSON `[{title, body}]` (mode: "all cards" | "key points"; segment by idea, headings are hints) → creates cards one by one, bumping `jobs.Done` after each → Status done. Client renders progress panel + cards appear live. On error: Status error + Note, completed cards kept (G6). Bump `rooms.ImportCount`.
 
-- [ ] Implement action (background-job pattern from `/guides/background-jobs.md` — fetch it first; if the doc's job primitive fits better than a hand-rolled loop, use it and log the decision)
-- [ ] Import panel UI (paste box, mode radio, mid-import progress per design)
-- [ ] **Check:** paste a heading-less wall of text → several sensibly-titled cards; wire log line
-- [ ] Two-window check: importer in A, cards materialize in B
-- [ ] Commit `stage 6: AI paste import as live background job`
+- [x] Implement action (background-job pattern from `/guides/background-jobs.md` — fetch it first; if the doc's job primitive fits better than a hand-rolled loop, use it and log the decision)
+- [x] Import panel UI (paste box, mode radio, mid-import progress per design)
+- [x] **Check:** paste a heading-less wall of text → several sensibly-titled cards; wire log line
+- [x] Two-window check: importer in A, cards materialize in B
+- [x] Commit `stage 6: AI paste import as live background job`
 
 ### Task 7: Import v2 — Google Docs via Composio (per-user OAuth)
 
 **Files:** Create `warroom/src/actions/google-docs.ts` (list/fetch), modify `ImportPanel.tsx` (connect state, doc picker).
 
-- [ ] `composio/list-toolkits` → confirm Google Docs toolkit + tool slugs (recorded in Task 1); `initiate-connection` → consent URL button; `get-connection` polling; `execute-tool` fetch doc text → feed into Task 6 pipeline
-- [ ] Handle `requiresConnection` signal gracefully (show connect button, retry after)
-- [ ] **User attention:** needs a real Google account consent in the browser — flag when ready to test
-- [ ] Commit `stage 7: google docs import via composio oauth`
+- [x] `composio/list-toolkits` → confirm Google Docs toolkit + tool slugs (recorded in Task 1); `initiate-connection` → consent URL button; `get-connection` polling; `execute-tool` fetch doc text → feed into Task 6 pipeline
+- [x] Handle `requiresConnection` signal gracefully (show connect button, retry after)
+- [x] **User attention:** needs a real Google account consent in the browser — flag when ready to test
+- [x] Commit `stage 7: google docs import via composio oauth`
 - **Cut line:** if Composio/toolkit blocks >45min, ship paste-only, log, move on.
 
 ### Task 8: AI summary + export
 
 **Files:** Create `warroom/src/actions/summarize.ts`, `src/components/SummaryPanel.tsx`.
 
-- [ ] Action: read cards + closed polls → `anthropic/chat-completion` → `{decisions:[{time,title,detail}]}` → store on room record (cache 1/min — G8)
-- [ ] Dispatch panel per design; export = Markdown file download
-- [ ] Commit `stage 8: summary dispatch + markdown export`
+- [x] Action: read cards + closed polls → `anthropic/chat-completion` → `{decisions:[{time,title,detail}]}` → store on room record (cache 1/min — G8)
+- [x] Dispatch panel per design; export = Markdown file download
+- [x] Commit `stage 8: summary dispatch + markdown export`
 
 ### Task 9: Payments gate
 
 **Files:** Create/modify `warroom/src/subscriptions.ts`, pricing page, gate in `import-text.ts`.
 
-- [ ] Declare Free/Pro per `/guides/payments.md`; gate: `ImportCount >= 3 && !pro` → refuse with `upgrade_required`; client shows pricing
-- [ ] Check: 4th import as free user refused server-side
-- [ ] Commit `stage 9: free tier gate + pro subscription`
+- [x] Declare Free/Pro per `/guides/payments.md`; gate: `ImportCount >= 3 && !pro` → refuse with `upgrade_required`; client shows pricing
+- [x] Check: 4th import as free user refused server-side
+- [x] Commit `stage 9: free tier gate + pro subscription`
 - Note for writeup: real checkout needs dashboard Connect onboarding; gate enforced regardless.
 
 ### Task 10: Design pass + seed + landing
 
-- [ ] Apply brief tokens/type/motion across screens; wire log component; public landing page
-- [ ] Seed demo room (script or first-login bootstrap action)
-- [ ] Commit `stage 10: design pass + demo seed`
+- [x] Apply brief tokens/type/motion across screens; wire log component; public landing page
+- [x] Seed demo room (script or first-login bootstrap action)
+- [x] Commit `stage 10: design pass + demo seed`
 
 ### Task 11: Verify, deploy, writeup
 
-- [ ] `npx deepspace test run all`; fix or log failures honestly
-- [ ] `/security-review` skill over the diff (secrets, identity, permission holes)
-- [ ] `npx deepspace deploy` → live URL; `deepspace logs --follow` while exercising the core path on prod; two-window check on prod
-- [ ] Draft `docs/SUBMISSION.md`: what built, capabilities used, main tradeoff, what the agent did, what the human verified, next steps
-- [ ] Commit `stage 11: deployed + submission writeup`
+- [x] `npx deepspace test run all`; fix or log failures honestly
+- [x] `/security-review` skill over the diff (secrets, identity, permission holes)
+- [x] `npx deepspace deploy` → live URL; `deepspace logs --follow` while exercising the core path on prod; two-window check on prod
+- [x] Draft `docs/SUBMISSION.md`: what built, capabilities used, main tradeoff, what the agent did, what the human verified, next steps
+- [x] Commit `stage 11: deployed + submission writeup`
 
 ## Self-review notes
 

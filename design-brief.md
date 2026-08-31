@@ -81,3 +81,12 @@ Must be buildable in Tailwind v4 + shadcn-style primitives within a day — so: 
 ---
 
 **The one idea to protect above all others:** dark terminal chrome + warm paper artifacts + the three-voice typography. Everything else is negotiable; that is the spirit.
+
+---
+
+## Implementation deviations (post-build)
+
+The brief predates the build; the shipped app deviates deliberately (details in `docs/BUGLOG.md`):
+- Import progress reads `CARD n/m`, not `SECTION n/m` — messy docs have no sections; the AI segments by idea (D-004/G4).
+- Import sources: paste-text is primary, Google Docs via OAuth secondary (risk ordering, D-002); export is a Markdown download — export-back-to-Docs is named future work, not core.
+- Free tier is "3 imports per room", rooms unlimited — the pricing card copy follows the implementation, not the brief's `3 IMPORTS · 1 ROOM` line.

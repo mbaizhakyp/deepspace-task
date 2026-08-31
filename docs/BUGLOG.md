@@ -68,6 +68,19 @@ Decision: a single admin-read-only `audit` collection in the app scope; written 
 Why: choke points mean nothing can forget to log; admin-only RBAC means the trail is invisible to users; deep string truncation keeps document content out of it.
 Beats: per-feature log calls (drift), a custom client reporter (the platform ships one), building the portal now (not asked for).
 
+## B-006 · Decided polls weren't settled: late votes and reopens were server-legal · FIXED
+When: 2026-08-31, found by external review (second-model pass over the docs)
+Symptom: nothing user-visible — clients disable voting on closed polls, but the server accepted raw votes on decided polls, and `polls: update true` let ANY member flip status back to open (or forge an early close). Results of a "decided" poll were quietly mutable.
+Root cause: the votes collection can't see poll status, and status is just a column under a blanket update rule — another time-varying rule RBAC can't express (same class as freeze, D-008).
+Fix: two new guards in AppRecordRoom's message boundary next to freezeDenial — `closedPollVoteDenial` (create/revote/delete votes on a decided poll → rejected) and `pollStatusDenial` (open poll: creator or facilitator may close; decided poll: only the facilitator may reopen — decided means decided, even for the creator).
+Verified: warroom.spec.ts extended — B fires a raw vote AND a raw reopen at a decided poll through its live socket; both bounce; the facilitator's close of someone else's poll works. 11/11 green. Interesting wrinkle: the first spec run "failed" because B is the poll's creator and the draft rule let creators reopen — the test forced the product decision, then enforced it.
+
+## D-016 · External review triage: what we took, what was already solved
+When: 2026-08-31 (user forwarded a second model's review of the repo docs)
+Taken (real): B-006 poll lifecycle holes; delete-× shown on cards the server would refuse (now mirrors `delete:'own'`); PLAN checkboxes/stale sketches contradicting shipped code (now a marked historical doc with divergence notes); REQUIREMENTS `?`-bullet rewritten as the decision; shareable-link access model stated honestly; per-room quota loophole documented as accepted (D-014); design-brief deviation notes; SUBMISSION gains hour breakdown + leads with adversarial evidence.
+Already solved in shipped code (review read pre-build docs): vote overwrite (userBound + uniqueOn + update:'own' — deterministic ids were never shipped); freeze role-loop atomicity + mid-freeze joiners (D-008 interception has neither problem); hand-rolled import loop (platform JobRoom, D-010); summary rate-limit (server-side summaryAt check).
+Declined: making per-account import metering real now (accepted ceiling, D-014); stripping the card-rotation design work (already done and cheap; design polish never displaced a correctness fix).
+
 ## D-001 · No video/audio calls
 When: planning
 Decision: presence (avatars + live cursors) carries the "we're together" feeling; no LiveKit.

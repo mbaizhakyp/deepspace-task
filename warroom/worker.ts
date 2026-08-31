@@ -66,9 +66,20 @@ export class AppRecordRoom extends RecordRoom<Env> {
   override async webSocketMessage(ws: WebSocket, message: ArrayBuffer | string): Promise<void> {
     if (typeof message === 'string') {
       try {
-        const msg = JSON.parse(message) as { type?: string; payload?: { requestId?: string } }
+        const msg = JSON.parse(message) as {
+          type?: string
+          payload?: {
+            requestId?: string
+            collection?: string
+            recordId?: string
+            data?: Record<string, unknown>
+          }
+        }
         if (msg.type === MSG.PUT || msg.type === MSG.DELETE) {
-          const denial = this.freezeDenial(ws)
+          const denial =
+            this.freezeDenial(ws) ??
+            this.closedPollVoteDenial(msg.payload) ??
+            this.pollStatusDenial(ws, msg.payload)
           if (denial) {
             const requestId = msg.payload?.requestId
             if (requestId) {
@@ -82,6 +93,70 @@ export class AppRecordRoom extends RecordRoom<Env> {
       }
     }
     return super.webSocketMessage(ws, message)
+  }
+
+  /**
+   * Votes on a decided poll are rejected — the votes collection can't know
+   * the poll's status, so the rule lives here with the other time-varying
+   * guards. Covers create, revote, and vote deletion alike.
+   */
+  private closedPollVoteDenial(payload?: {
+    collection?: string
+    recordId?: string
+    data?: Record<string, unknown>
+  }): string | null {
+    if (payload?.collection !== 'votes') return null
+    try {
+      let pollId = typeof payload.data?.pollId === 'string' ? payload.data.pollId : null
+      if (!pollId && payload.recordId) {
+        const rows = this.sql
+          .exec(`SELECT col_pollid FROM c_votes WHERE _row_id = ?`, payload.recordId)
+          .toArray() as Array<{ col_pollid: string | null }>
+        pollId = rows[0]?.col_pollid ?? null
+      }
+      if (!pollId) return null
+      const polls = this.sql
+        .exec(`SELECT col_status FROM c_polls WHERE _row_id = ?`, pollId)
+        .toArray() as Array<{ col_status: string | null }>
+      return polls[0]?.col_status === 'closed' ? 'permission denied: this poll is decided' : null
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Poll lifecycle rule: an OPEN poll may be closed by its creator or the
+   * facilitator; a CLOSED poll is a decision — only the facilitator can
+   * reopen it (decided means decided, even for the creator). Members keep
+   * `update: true` on polls so anyone can triage (move them around); this
+   * guards just the status/closedAt fields.
+   */
+  private pollStatusDenial(
+    ws: WebSocket,
+    payload?: { collection?: string; recordId?: string; data?: Record<string, unknown> },
+  ): string | null {
+    if (payload?.collection !== 'polls' || !payload.recordId || !payload.data) return null
+    if (!('status' in payload.data) && !('closedAt' in payload.data)) return null
+    try {
+      const attachment = ws.deserializeAttachment() as { userId?: string } | null
+      const sender = attachment?.userId
+      if (!sender) return 'permission denied: sign in to close polls'
+      const settings = this.sql
+        .exec(`SELECT col_facilitatorid FROM c_board_settings WHERE _row_id = 'settings'`)
+        .toArray() as Array<{ col_facilitatorid: string | null }>
+      if (settings[0]?.col_facilitatorid === sender) return null // facilitator: full control
+      const polls = this.sql
+        .exec(`SELECT _created_by, col_status FROM c_polls WHERE _row_id = ?`, payload.recordId)
+        .toArray() as Array<{ _created_by: string | null; col_status: string | null }>
+      if (!polls[0]) return null
+      if (polls[0].col_status === 'closed') {
+        return 'permission denied: this poll is decided — only the facilitator can reopen it'
+      }
+      if (polls[0]._created_by === sender) return null // creator may close their open poll
+      return 'permission denied: only the poll creator or facilitator can close it'
+    } catch {
+      return null
+    }
   }
 
   /** Non-null = reject reason: board frozen and sender isn't the facilitator. */

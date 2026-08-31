@@ -93,4 +93,37 @@ test('war room: live sync, one-vote polls, server-enforced freeze', async ({ use
       { timeout: 10_000 },
     )
     .toBe(777)
+
+  // ── decided polls are settled: raw late votes and forged reopens bounce ──
+  // A (facilitator) closes B's poll — allowed by the creator-or-facilitator rule
+  await a.page.getByRole('button', { name: 'CLOSE', exact: true }).click()
+  await expect(b.page.getByText(/RESULT ·/)).toBeVisible({ timeout: 10_000 })
+
+  // B fires a raw vote at the decided poll through its live socket
+  await b.page.evaluate(() => {
+    const hook = (window as unknown as Record<string, unknown>).__warroomTest as {
+      polls: Array<{ id: string }>
+      createVote: (data: Record<string, unknown>) => Promise<string>
+    }
+    void hook.createVote({ pollId: hook.polls[0].id, voterId: 'x', optionIndex: 0 }).catch(() => {})
+  })
+  // and a raw forged reopen
+  await b.page.evaluate(() => {
+    const hook = (window as unknown as Record<string, unknown>).__warroomTest as {
+      polls: Array<{ id: string }>
+      putPoll: (id: string, patch: Record<string, unknown>) => Promise<void>
+    }
+    void hook.putPoll(hook.polls[0].id, { status: 'open' }).catch(() => {})
+  })
+  await b.page.waitForTimeout(1500)
+  // poll stays decided with the same single vote, in BOTH windows
+  await expect(a.page.getByText(/RESULT ·/)).toBeVisible()
+  await expect(a.page.getByText(/DECIDED .* 1 VOTED/)).toBeVisible()
+  const pollStatusSeenByA = await a.page.evaluate(() => {
+    const hook = (window as unknown as Record<string, unknown>).__warroomTest as {
+      polls: Array<{ id: string; status?: string }>
+    }
+    return hook.polls[0]?.status
+  })
+  expect(pollStatusSeenByA).toBe('closed')
 })
