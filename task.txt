@@ -1,0 +1,46 @@
+Build exercise: ship something small
+
+Build and deploy a small full-stack app on DeepSpace. Your idea, your call. A focused, finished project is stronger than a large, incomplete one.
+
+Aim for 6–8 hours and stop when the timebox ends. We care about your judgment and explanation as much as the feature count. If something remains unfinished, tell us what you would do next.
+
+Use at least three relevant DeepSpace capabilities, such as auth, realtime data, permissions, presence, storage, payments, AI chat, or background jobs. The result should be interactive, not a static page.
+Start here
+
+    npx deepspace: scaffold
+    npx deepspace deploy: ship to <name>.app.space
+    Docs: docs.deep.space
+    Agent skill: github.com/deepdotspace/deepspace-skill
+    Examples: github.com/deepdotspace. Read one or two, then build your own.
+
+You may use a coding agent. We want to see how you direct it, verify its work, and take over when needed.
+Submit in the portal
+
+    The live URL
+    The repository
+    A short note covering what you built, which platform capabilities you used, the main tradeoff you made, what the agent did, and what you verified yourself
+
+After review, selected applicants will receive a link to schedule the live coding session in the portal. You do not need to join another service to continue the process.
+Ownership and use
+
+This exercise is solely for evaluating your application. You own the submission. DeepSpace will not ship, sell, publish, or incorporate your code, design, copy, or concept into its products or marketing without a separate written agreement. Do not use confidential information from a current or former employer, school, or client.
+What we look for
+Build exercise
+
+    respected the 6–8 hour timebox and chose a sensible scope
+    deployed result works on its important path; unfinished edges are explained honestly
+    used at least three relevant SDK capabilities, with permissions actually gating access where applicable
+    code is understandable, secrets are protected, and platform primitives are used instead of being reimplemented without a reason
+    writeup explains the main tradeoff, what the agent did, and what the applicant verified or changed
+    originality or commercial value is not a scoring criterion; the submission is evaluation-only and remains the applicant's
+
+Move to the live coding session when the submission shows sound judgment, a working core, and real understanding of the SDK. Do not reward extra unpaid hours beyond the stated timebox.
+Live coding session
+
+    can explain and modify the submitted work
+    reads errors, forms a hypothesis, and tests it
+    thinks aloud and asks useful questions
+    directs AI tools deliberately and verifies their output
+    responds constructively to review
+
+Record the selection decision separately from any later paid-role hiring process. Internship completion does not guarantee employment.
