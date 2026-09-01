@@ -102,9 +102,14 @@ export function SummaryPanel({
               setFmtOpen(false)
             }}
             title="Past dispatches"
-            className={`rounded-sm border px-2 py-1.5 ${view === 'history' ? 'border-signal text-signal' : 'border-border hover:border-chrome hover:text-foreground'}`}
+            aria-label="Past dispatches"
+            className={`rounded-sm border px-2 py-[5px] ${view === 'history' ? 'border-signal text-signal' : 'border-border hover:border-chrome hover:text-foreground'}`}
           >
-            HISTORY
+            {/* history: a clock running backwards */}
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
+              <path d="M2.5 7a4.5 4.5 0 104.5-4.5c-1.8 0-3.2.9-4 2.2" />
+              <path d="M3 1.5v3h3M7 4.8V7l1.8 1.3" />
+            </svg>
           </button>
           {shown && !working && (
             <span className="relative">
@@ -145,9 +150,13 @@ export function SummaryPanel({
           )}
           <button
             onClick={onClose}
-            className="rounded-sm border border-border px-2 py-1.5 hover:border-chrome hover:text-foreground"
+            title="Close"
+            aria-label="Close the dispatch panel"
+            className="rounded-sm border border-border px-2 py-[5px] hover:border-chrome hover:text-foreground"
           >
-            CLOSE ✕
+            <svg width="13" height="13" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
+              <path d="M3.5 3.5l7 7M10.5 3.5l-7 7" />
+            </svg>
           </button>
         </span>
       </div>
