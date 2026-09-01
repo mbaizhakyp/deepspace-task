@@ -23,10 +23,12 @@ type RoomData = { memberIds: unknown; facilitatorId: string; importCount?: numbe
 const TESTER_EMAILS = ['mbaizhakyp.job@gmail.com']
 const TESTER_IMPORT_LIMIT = 20
 
-async function isTester(t: AppActionTools, userId: string): Promise<boolean> {
+export async function isTester(t: AppActionTools, userId: string): Promise<boolean> {
   const res = await t.get<{ email?: string }>('users', userId)
-  const email = res.success ? res.data?.record?.data?.email : undefined
-  return !!email && TESTER_EMAILS.includes(email.toLowerCase())
+  const email = res.success ? res.data?.record?.data?.email?.toLowerCase() : undefined
+  // *@deepspace.test = the platform's own QA accounts (Playwright fixtures) —
+  // they accumulate rooms across runs and must never hit the paywall
+  return !!email && (TESTER_EMAILS.includes(email) || email.endsWith('@deepspace.test'))
 }
 
 export const startImport: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
@@ -78,7 +80,7 @@ export async function checkQuotaAndEnqueue(
 }
 
 /** Ask the platform for the caller's own subscription; entitled = active/trialing pro. */
-async function isProEntitled(env: Env, callerJwt: string): Promise<boolean> {
+export async function isProEntitled(env: Env, callerJwt: string): Promise<boolean> {
   try {
     const res = await apiWorkerFetch(env, '/api/subscriptions/me', {
       headers: { Authorization: `Bearer ${callerJwt}` },

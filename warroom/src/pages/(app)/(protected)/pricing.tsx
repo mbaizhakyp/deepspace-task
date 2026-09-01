@@ -51,7 +51,7 @@ export default function PricingPage() {
           <div className="wire text-[10px] text-ink-muted">FREE</div>
           <div className="mt-1 font-serif text-3xl text-ink">$0</div>
           <ul className="wire mt-5 flex flex-col gap-2 text-[11px] text-ink-muted">
-            <li>UNLIMITED ROOMS &amp; MEMBERS</li>
+            <li>3 ROOMS · UNLIMITED MEMBERS</li>
             <li>LIVE BOARD · POLLS · FREEZE</li>
             <li>3 IMPORTS PER ROOM</li>
             <li>AI SUMMARY &amp; EXPORT</li>
@@ -89,7 +89,7 @@ export default function PricingPage() {
           </div>
           <ul className="wire mt-5 flex flex-col gap-2 text-[11px] text-ink-muted">
             <li>EVERYTHING IN FREE</li>
-            <li className="text-ink">UNLIMITED IMPORTS</li>
+            <li className="text-ink">UNLIMITED ROOMS &amp; IMPORTS</li>
             <li>{interval === 'year' ? 'TWO MONTHS FREE VS MONTHLY' : '$90/YEAR IF PAID YEARLY'}</li>
           </ul>
           {isPro ? (

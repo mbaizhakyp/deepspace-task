@@ -10,6 +10,9 @@
 import type { ActionHandler } from 'deepspace/worker'
 import type { Env } from '../../worker'
 import type { AppActionTools } from '../server/action-routes'
+import { isProEntitled, isTester } from './imports'
+
+export const FREE_ROOM_LIMIT = 3
 
 type RoomData = {
   name: string
@@ -51,11 +54,21 @@ async function logEvent(tools: AppActionTools, roomId: string, text: string) {
   await tools.forRoom(`board:${roomId}`).create('events', { at: Date.now(), text })
 }
 
-export const createRoom: ActionHandler<Env> = async ({ userId, params, tools }) => {
+export const createRoom: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
   const t = tools as AppActionTools
   const name = typeof params.name === 'string' ? params.name.trim().slice(0, 80) : ''
   const userName = typeof params.userName === 'string' ? params.userName.slice(0, 80) : 'facilitator'
   if (!name) return { success: false, error: 'room name required' }
+
+  // free tier: 3 rooms as facilitator (D-044); Pro (or the QA tester) lifts it
+  const all = await t.query<RoomData>('rooms', { limit: 500 })
+  const facilitated = (all.success ? (all.data?.records ?? []) : []).filter(
+    (r) => r.data.facilitatorId === userId,
+  ).length
+  if (facilitated >= FREE_ROOM_LIMIT) {
+    const entitled = (await isProEntitled(env, callerJwt)) || (await isTester(t, userId))
+    if (!entitled) return { success: false, error: 'upgrade_required' }
+  }
 
   const created = await t.create('rooms', {
     name,

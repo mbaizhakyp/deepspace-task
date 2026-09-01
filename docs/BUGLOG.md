@@ -358,3 +358,19 @@ Decisions:
 When: user feedback round 8 ("relevant journey buttons should be filled with a contrasting color — you decide")
 Decision: three tiers. (1) ORANGE stays reserved for each screen's one true ask (Summarize, Import to the board, Open a room, armed JOIN, Go Pro). (2) A new `.btn-solid` (foreground-on-background — auto-contrasts in both themes) fills secondary journey actions: COPY INVITE, BROWSE YOUR GOOGLE DOCS, IMPORT ANOTHER, the whole camera HUD (also enlarged), the dispatch download icon. (3) Wire-bordered stays for chrome/utilities (toolbar, CLOSE, HISTORY).
 Beats: filling everything (kills hierarchy) and more orange (violates the one-ask rule).
+
+## D-044 · Free tier: 3 rooms as facilitator, server-enforced
+When: user request, round 9
+Decision: create-room counts the caller's facilitated rooms; the 4th needs Pro (or tester status). Copy updated everywhere the tier is stated (pricing cards, landing, lobby masthead). Platform QA accounts (*@deepspace.test) joined the tester allowlist — the Playwright fixtures accumulate rooms across runs and immediately hit the new gate (caught by the suite failing before deploy).
+Beats: client-side counting (forgeable) and blocking joins (membership stays unlimited — the gate is on creating, the thing that costs).
+
+## D-045 · Walkthrough tours + journey-first fixes (round 9)
+When: user feedback round 9
+Decisions:
+- Optional walkthrough, offered once per surface via a quiet bottom chip (TAKE THE TOUR / SKIP): a dependency-free spotlight Tour (dim page, lit target, wire callout) — 4 lobby steps (nav, theme, new room, join) and 6 room steps (import, poll, card, invite code, summarize, camera). Missing anchors (facilitator-only buttons) auto-skip.
+- The room's invite button IS the code: it reads WR-XXXXXX and copying it copies exactly that (user: "the link should be just the code"). Code-less legacy rooms fall back to copying the link.
+- Empty board shows a centered "An empty table." + IMPORT A DOCUMENT call — the journey's first move made unmissable; the toolbar IMPORT also moved up to the solid tier.
+- JOIN affordance strengthened: valid input → orange + grow + glow (round-6's color alone didn't land).
+- Signed-out landing gained a below-the-fold section: HOW A WARROOM RUNS (01 IMPORT / 02 DECIDE / 03 EXPORT), a one-line pricing strip, and a second "Start here — it's free" ask.
+- Dispatch empty-state copy cut to a laconic CTA ("Nothing to file yet. Import a document, argue it out — then summarize.").
+- HUD chips softened (round-8's solid tier read too loud floating over the board): raised card-colored chips with hairlines.

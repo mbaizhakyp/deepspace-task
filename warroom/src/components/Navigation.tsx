@@ -69,6 +69,7 @@ function ThemeToggle() {
   return (
     <button
       onClick={toggle}
+      data-tour="theme"
       title={day ? 'Back to the night desk' : 'Switch to the day edition'}
       className="wire flex items-center gap-1.5 rounded-sm border border-border px-2.5 py-1.5 text-chrome hover:border-chrome hover:text-foreground"
     >
@@ -142,7 +143,7 @@ export default function Navigation() {
           </Link>
 
           <div className="mx-1 hidden h-6 w-px bg-border md:block" />
-          <div className="hidden items-center md:flex">{visibleNav.map(navLink)}</div>
+          <div data-tour="nav" className="hidden items-center md:flex">{visibleNav.map(navLink)}</div>
 
           <div className="flex-1" />
 

@@ -237,8 +237,7 @@ export function SummaryPanel({
         </>
       ) : (
         <p className="mt-4 text-[13px] leading-relaxed text-muted-foreground">
-          No dispatch yet. Summarize the board once the cards are argued over and the polls are
-          closed — decisions read best when they're actually decided.
+          Nothing to file yet. Import a document, argue it out — then summarize.
         </p>
       )}
 

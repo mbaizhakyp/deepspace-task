@@ -316,6 +316,17 @@
   opacity: 0.4;
 }
 
+/* HUD chips (round 9): the solid tier read too loud floating on the board —
+   raised card chips are visible without shouting. */
+.hud-chip {
+  background-color: var(--color-card);
+  color: var(--color-foreground);
+  border: 1px solid var(--color-border);
+}
+.hud-chip:hover {
+  border-color: var(--color-chrome);
+}
+
 /* Honest "working" bar for stages with no measurable progress */
 @keyframes indeterminate-slide {
   from { transform: translateX(-110%); }

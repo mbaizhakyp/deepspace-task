@@ -12,6 +12,14 @@ import { callAction } from '../../../lib/actions-client'
 import { parseMemberIds } from '../../../actions/rooms'
 import { parseJoinInput } from '../../../lib/join-code'
 import { leftRooms } from '../../../lib/left-rooms'
+import { TourOffer } from '../../../components/Tour'
+
+const LOBBY_TOUR = [
+  { anchor: 'nav', title: 'THE DESK', body: 'Rooms is your lobby, Pricing the plans, Settings your account. The wire clock is always on.' },
+  { anchor: 'theme', title: 'DAY / NIGHT', body: 'Flip between the night desk and the day edition any time — your cards stay paper either way.' },
+  { anchor: 'new-room', title: 'START HERE', body: 'Open a room and name the decision — "Q3 launch plan". You become its facilitator.' },
+  { anchor: 'join', title: 'INVITED?', body: 'Paste the room link or type a WR- code here. Opening a link also joins you automatically.' },
+]
 
 type Room = { name: string; facilitatorId: string; memberIds?: unknown }
 
@@ -51,6 +59,8 @@ export default function RoomsPage() {
     setCreating(false)
     createGuard.current = false
     if (res.success && res.data?.roomId) navigate(`/room/${res.data.roomId}`)
+    else if (res.error === 'upgrade_required')
+      error('Free tier is 3 rooms', 'Pro removes the limit — see Pricing. Or delete a room you no longer need.')
     else error('Could not open the room', res.error)
   }
 
@@ -119,7 +129,7 @@ export default function RoomsPage() {
           <div className="wire flex items-baseline justify-between border-b border-border pb-1 text-[10px] text-chrome">
             <span>{today}</span>
             <span>DECISIONS DAILY</span>
-            <span>FREE EDITION · 3 IMPORTS PER ROOM</span>
+            <span>FREE EDITION · 3 ROOMS · 3 IMPORTS EACH</span>
           </div>
           <h1 className="py-3 text-center font-serif text-6xl tracking-tight text-foreground">
             The Warroom
@@ -128,12 +138,14 @@ export default function RoomsPage() {
 
         <div className="mt-8 flex gap-3">
           <button
+            data-tour="new-room"
             onClick={() => setIntent(intent === 'create' ? 'none' : 'create')}
             className={`wire flex-1 rounded-sm border px-4 py-3.5 ${intent === 'create' ? 'border-primary text-primary' : 'border-border text-chrome hover:border-chrome hover:text-foreground'}`}
           >
             + NEW ROOM
           </button>
           <button
+            data-tour="join"
             onClick={() => setIntent(intent === 'join' ? 'none' : 'join')}
             className={`wire flex-1 rounded-sm border px-4 py-3.5 ${intent === 'join' ? 'border-primary text-primary' : 'border-border text-chrome hover:border-chrome hover:text-foreground'}`}
           >
@@ -169,19 +181,27 @@ export default function RoomsPage() {
             />
             {/* the button lights orange the moment the input parses — the
                 "you may go" signal (user feedback, round 6) */}
+            {/* the "you may go" signal: valid input → the button goes orange,
+                grows, and glows (strengthened per round-9 feedback) */}
             <button
               onClick={joinByCode}
               disabled={!parseJoinInput(joinCode) || joining}
-              className={`wire rounded-sm px-5 transition-colors ${
+              className={`wire rounded-sm px-6 transition-all duration-200 ${
                 parseJoinInput(joinCode)
-                  ? 'bg-primary font-semibold text-primary-foreground hover:brightness-110'
+                  ? 'scale-105 bg-primary font-semibold text-primary-foreground shadow-[0_0_14px_rgba(232,100,27,.55)] hover:brightness-110'
                   : 'border border-border text-chrome/50'
               }`}
             >
-              {joining ? 'JOINING…' : 'JOIN'}
+              {joining ? 'JOINING…' : 'JOIN →'}
             </button>
           </div>
         )}
+
+        <TourOffer
+          storageKey="warroom-tour-lobby"
+          label="FIRST TIME AT THE DESK?"
+          steps={LOBBY_TOUR}
+        />
 
         <div className="wire mt-10 border-b border-border pb-1 text-[10px] text-chrome">
           YOUR ROOMS

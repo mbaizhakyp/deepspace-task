@@ -29,11 +29,8 @@ export default function Landing() {
   const prev = WIRE_LINES[(tick + WIRE_LINES.length - 1) % WIRE_LINES.length]
 
   return (
-    <div
-      data-testid="static-landing"
-      className="dotgrid flex min-h-screen items-center justify-center px-6 py-16"
-    >
-      <div className="grid w-full max-w-6xl items-center gap-14 lg:grid-cols-2">
+    <div data-testid="static-landing" className="dotgrid px-6">
+      <div className="mx-auto grid min-h-screen w-full max-w-6xl items-center gap-14 py-16 lg:grid-cols-2">
         {/* ── The pitch ── */}
         <div className="flex flex-col items-center text-center lg:items-start lg:text-left">
           <p className="wire text-chrome">WARROOM</p>
@@ -70,7 +67,7 @@ export default function Landing() {
             Open your war room
           </Link>
           <p className="wire mt-14 text-[10px] text-chrome/60">
-            FREE · 3 IMPORTS PER ROOM · NO CALL REQUIRED
+            FREE · 3 ROOMS · 3 IMPORTS EACH · NO CALL REQUIRED
           </p>
         </div>
 
@@ -129,6 +126,57 @@ export default function Landing() {
               {line}
             </div>
           </div>
+        </div>
+      </div>
+
+      {/* ── below the fold: the journey, spelled out (D-045) ── */}
+      <div className="mx-auto max-w-6xl border-t-2 border-foreground/60 py-16">
+        <div className="wire text-chrome">HOW A WARROOM RUNS</div>
+        <div className="mt-8 grid gap-10 sm:grid-cols-3">
+          {[
+            {
+              n: '01',
+              t: 'Import',
+              d: 'Browse your Google Docs or paste anything — tidy spec or messy notes. The AI splits it by idea; cards land on the shared board live, batch by batch.',
+            },
+            {
+              n: '02',
+              t: 'Decide',
+              d: 'Argue as cards with live cursors. Contested points become polls — one vote per person, enforced by the database. The facilitator can freeze the room.',
+            },
+            {
+              n: '03',
+              t: 'Export',
+              d: 'The AI files the dispatch: what was decided, with the vote counts as evidence. Download it as Markdown or PDF — every dispatch is kept.',
+            },
+          ].map((s) => (
+            <div key={s.n}>
+              <div className="wire text-primary">{s.n}</div>
+              <div className="mt-2 font-serif text-2xl text-foreground">{s.t}</div>
+              <p className="mt-2 text-[13px] leading-relaxed text-muted-foreground">{s.d}</p>
+            </div>
+          ))}
+        </div>
+
+        <div className="mt-14 flex flex-col items-start justify-between gap-8 border-t border-border pt-10 sm:flex-row sm:items-center">
+          <div>
+            <div className="wire text-chrome">PRICING</div>
+            <div className="mt-2 flex items-baseline gap-6">
+              <span className="font-serif text-2xl text-foreground">
+                Free <span className="wire ml-1 align-middle text-[10px] text-chrome">3 ROOMS · 3 IMPORTS EACH</span>
+              </span>
+              <span className="font-serif text-2xl text-foreground">
+                $9<span className="text-base text-muted-foreground">/mo</span>{' '}
+                <span className="wire ml-1 align-middle text-[10px] text-chrome">UNLIMITED · $90/YR</span>
+              </span>
+            </div>
+          </div>
+          <Link
+            to="/rooms"
+            className="rounded-sm bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:brightness-110"
+          >
+            Start here — it's free
+          </Link>
         </div>
       </div>
     </div>

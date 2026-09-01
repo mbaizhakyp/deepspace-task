@@ -12,10 +12,21 @@ import { Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
 import { fitView, gridSpacing, toWorld, zoomView, type View } from '../lib/camera'
 import { leftRooms } from '../lib/left-rooms'
+import { TourOffer } from './Tour'
+
 import { parseOptions, PollCard, type PollData, type VoteData } from './PollCard'
 import { ImportPanel } from './ImportPanel'
 import { SummaryPanel } from './SummaryPanel'
 import type { Summary } from '../actions/summarize'
+
+const ROOM_TOUR = [
+  { anchor: 'import', title: 'BRING THE DOCUMENT', body: 'Import is where meetings start: browse your Google Docs or paste anything — the AI splits it into cards that land live for everyone.' },
+  { anchor: 'poll', title: 'DECIDE', body: 'Contested point? Open a poll. One vote per person — enforced by the database, not the buttons.' },
+  { anchor: 'card', title: 'ADD YOUR OWN', body: 'Drop a blank card wherever you\'re looking. Double-click any card to write on it; drag to arrange.' },
+  { anchor: 'invite', title: 'GET THE TEAM IN', body: 'That IS the room code — click to copy it. Teammates enter it under JOIN BY LINK (or just open your room URL).' },
+  { anchor: 'summarize', title: 'FILE THE DISPATCH', body: 'When it\'s decided, the AI writes "what was decided" — exportable as Markdown or PDF, with full history.' },
+  { anchor: 'hud', title: 'THE CAMERA', body: 'Drag empty ground to pan, pinch to zoom, FIT ALL to frame everything. The download icon exports the whole board.' },
+]
 
 export type CardData = {
   title: string
@@ -285,11 +296,10 @@ export default function Board({
 
   const [invited, setInvited] = useState(false)
   async function copyInvite() {
-    // one invite, both keys: the link (open it → you're in) and the code
-    // (type it in the lobby). Combined per user feedback (D-042).
-    const invite = roomCode
-      ? `Join my war room "${roomName}": ${window.location.href} · or enter code WR-${roomCode}`
-      : window.location.href
+    // the button IS the code (round 9): what you copy is exactly what you
+    // see, short enough to read aloud or type. Older code-less rooms fall
+    // back to copying the link.
+    const invite = roomCode ? `WR-${roomCode}` : window.location.href
     try {
       await navigator.clipboard.writeText(invite)
       setInvited(true)
@@ -397,12 +407,13 @@ export default function Board({
             without breaking the wire voice (no emoji in chrome) */}
         {/* fixed width: the label swap must never reflow the header (D-042) */}
         <button
+          data-tour="invite"
           onClick={copyInvite}
-          title={roomCode ? `Copies the room link and code WR-${roomCode}` : 'Copies the room link'}
+          title={roomCode ? 'Copy the room code — teammates enter it under JOIN BY LINK' : 'Copy the room link'}
           className="btn-solid wire flex w-32 flex-none items-center justify-center gap-1.5 rounded-sm px-3 py-2 font-medium"
         >
           <Glyph name="invite" />
-          {invited ? 'COPIED ✓' : 'COPY INVITE'}
+          {invited ? 'COPIED ✓' : roomCode ? `WR-${roomCode}` : 'COPY LINK'}
         </button>
         {isFacilitator && (
           <button
@@ -419,14 +430,17 @@ export default function Board({
         )}
         <div className="mx-1 h-6 w-px bg-border" />
         <button
+          data-tour="import"
           onClick={() => setPanel(importOpen ? 'none' : 'import')}
           disabled={locked}
-          className={`wire flex items-center gap-1.5 rounded-sm border px-3 py-2 disabled:opacity-50 ${importOpen ? 'border-primary text-primary' : 'border-border text-chrome hover:border-chrome hover:text-foreground'}`}
+          // the journey's first move — solid tier so it reads as the way in (D-045)
+          className={`btn-solid wire flex items-center gap-1.5 rounded-sm px-3.5 py-2 font-medium disabled:opacity-50 ${importOpen ? 'outline outline-1 outline-primary' : ''}`}
         >
           <Glyph name="import" />
           IMPORT
         </button>
         <button
+          data-tour="poll"
           onClick={() => setPollDialogOpen(true)}
           disabled={!pollMutations.ready || locked}
           className="wire flex items-center gap-1.5 rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-50"
@@ -435,6 +449,7 @@ export default function Board({
           NEW POLL
         </button>
         <button
+          data-tour="card"
           onClick={addCard}
           disabled={!ready || locked}
           className="wire flex items-center gap-1.5 rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-50"
@@ -444,6 +459,7 @@ export default function Board({
         </button>
         <div className="mx-1 h-6 w-px bg-border" />
         <button
+          data-tour="summarize"
           onClick={() => setPanel(panel === 'summary' ? 'none' : 'summary')}
           className="rounded-sm bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground"
         >
@@ -565,10 +581,10 @@ export default function Board({
 
         {/* camera HUD — screen-fixed, like the wire log; solid fill so the
             controls read on any board (D-043) */}
-        <div className="wire absolute bottom-4 right-5 z-30 flex items-center gap-2 text-chrome">
+        <div data-tour="hud" className="wire absolute bottom-4 right-5 z-30 flex items-center gap-2 text-chrome">
           <button
             onClick={exportBoard}
-            className="btn-solid mr-1 rounded-sm px-2.5 py-2"
+            className="hud-chip mr-1 rounded-sm px-2.5 py-2"
             title="Download the board as Markdown"
             aria-label="Download the board as Markdown"
           >
@@ -577,11 +593,11 @@ export default function Board({
               <path d="M1.5 9.5v2a1 1 0 001 1h9a1 1 0 001-1v-2" />
             </svg>
           </button>
-          <button onClick={() => zoomBy(1 / 1.25)} className="btn-solid rounded-sm px-3 py-1.5 text-[13px] leading-[14px]" aria-label="Zoom out">−</button>
+          <button onClick={() => zoomBy(1 / 1.25)} className="hud-chip rounded-sm px-3 py-1.5 text-[13px] leading-[14px]" aria-label="Zoom out">−</button>
           <span className="w-10 text-center tabular-nums">{Math.round(view.scale * 100)}%</span>
-          <button onClick={() => zoomBy(1.25)} className="btn-solid rounded-sm px-3 py-1.5 text-[13px] leading-[14px]" aria-label="Zoom in">+</button>
+          <button onClick={() => zoomBy(1.25)} className="hud-chip rounded-sm px-3 py-1.5 text-[13px] leading-[14px]" aria-label="Zoom in">+</button>
           {/* "RESET" read as "wipe the board" — it frames, so say so (D-032) */}
-          <button onClick={fitAll} className="btn-solid ml-1 flex items-center gap-1.5 rounded-sm px-3 py-2" title="Bring every card and poll into view">
+          <button onClick={fitAll} className="hud-chip ml-1 flex items-center gap-1.5 rounded-sm px-3 py-2" title="Bring every card and poll into view">
             <svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
               <path d="M1 3.5V1h2.5M8.5 1H11v2.5M11 8.5V11H8.5M3.5 11H1V8.5" />
               <circle cx="6" cy="6" r="1" fill="currentColor" stroke="none" />
@@ -589,6 +605,21 @@ export default function Board({
             FIT ALL
           </button>
         </div>
+
+        {/* empty table: the journey's first move, made unmissable (D-045) */}
+        {cards.length === 0 && polls.length === 0 && !importOpen && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-3">
+            <div className="font-serif text-3xl text-foreground/90">An empty table.</div>
+            <p className="wire text-chrome">BRING A DOCUMENT — CARDS LAND LIVE FOR EVERYONE</p>
+            <button
+              onClick={() => setPanel('import')}
+              disabled={locked}
+              className="btn-solid wire pointer-events-auto mt-2 rounded-sm px-5 py-3 font-medium disabled:opacity-50"
+            >
+              IMPORT A DOCUMENT
+            </button>
+          </div>
+        )}
 
         {/* wire log — the meeting writing its own record */}
         <div className="pointer-events-none absolute bottom-4 left-5 z-30 flex flex-col gap-1">
@@ -613,6 +644,8 @@ export default function Board({
         />
       )}
       </div>
+
+      <TourOffer storageKey="warroom-tour-room" label="FIRST ROOM?" steps={ROOM_TOUR} />
 
       {/* frozen chrome */}
       {frozen && (
