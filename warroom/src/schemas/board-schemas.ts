@@ -34,6 +34,8 @@ export const cardsSchema: CollectionSchema = {
     { name: 'y', storage: 'number', interpretation: 'plain', required: true },
     { name: 'origin', storage: 'text', interpretation: { kind: 'select', options: ['added', 'imported'] } },
     { name: 'authorName', storage: 'text', interpretation: 'plain' },
+    // which import batch this card came from — drives per-batch paper tints
+    { name: 'tint', storage: 'number', interpretation: 'plain' },
   ],
   permissions: {
     viewer: { read: true, create: false, update: false, delete: false },
@@ -84,6 +86,23 @@ export const votesSchema: CollectionSchema = {
   },
 }
 
+/** Dispatch history — every summary ever written for this board. The
+ * summarize server action is the only writer (members read-only). */
+export const summariesSchema: CollectionSchema = {
+  name: 'summaries',
+  columns: [
+    { name: 'at', storage: 'number', interpretation: 'plain', required: true },
+    { name: 'headline', storage: 'text', interpretation: 'plain' },
+    { name: 'json', storage: 'text', interpretation: { kind: 'json' } },
+    { name: 'authorName', storage: 'text', interpretation: 'plain' },
+  ],
+  permissions: {
+    viewer: { read: true, create: false, update: false, delete: false },
+    member: { read: true, create: false, update: false, delete: false },
+    admin: { read: true, create: true, update: true, delete: true },
+  },
+}
+
 /** Wire log — the meeting writing its own record. Append-only. */
 export const eventsSchema: CollectionSchema = {
   name: 'events',
@@ -103,5 +122,6 @@ export const boardCollectionSchemas: CollectionSchema[] = [
   cardsSchema,
   pollsSchema,
   votesSchema,
+  summariesSchema,
   eventsSchema,
 ]

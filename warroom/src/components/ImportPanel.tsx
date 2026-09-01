@@ -5,7 +5,7 @@
  * cards materialize on the board live as the job creates them.
  */
 
-import { useEffect, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthUser, useJobs } from 'deepspace'
 import { callAction } from '../lib/actions-client'
@@ -70,6 +70,21 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
       setStaleJobId(newest.id)
     }
   }, [newest, staleJobId, flow])
+
+  // elapsed clock for stages with no measurable progress (segmenting is the
+  // long one) — real seconds, not a fake percentage
+  const startRef = useRef(0)
+  const [nowMs, setNowMs] = useState(0)
+  useEffect(() => {
+    if (flow !== 'progress') {
+      startRef.current = 0
+      return
+    }
+    if (!startRef.current) startRef.current = Date.now()
+    const id = setInterval(() => setNowMs(Date.now()), 1000)
+    return () => clearInterval(id)
+  }, [flow])
+  const elapsed = startRef.current ? Math.max(0, Math.floor(((nowMs || Date.now()) - startRef.current) / 1000)) : 0
 
   const succeeded = current?.status === 'succeeded'
   const jobProgress = current?.progress ?? 0
@@ -262,6 +277,19 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
                       />
                     </div>
                   )}
+                  {s.bar === undefined && s.state === 'active' && (
+                    // no measurable progress here — show real motion + real
+                    // time so the wait visibly IS working, never a fake %
+                    <>
+                      <div className="mt-2 h-0.5 overflow-hidden rounded-full bg-border">
+                        <div className="indeterminate h-0.5 w-1/3 rounded-full bg-primary" />
+                      </div>
+                      <div className="wire mt-1.5 text-[10px] text-chrome">
+                        WORKING · {String(Math.floor(elapsed / 60)).padStart(2, '0')}:
+                        {String(elapsed % 60).padStart(2, '0')}
+                      </div>
+                    </>
+                  )}
                   {s.detail && (
                     <div className="wire wire-tick mt-1.5 text-[10px] text-chrome" key={s.detail}>
                       {s.detail}
@@ -278,7 +306,7 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
                 setEnqueued(false)
                 setViaGdoc(false)
               }}
-              className="wire mt-4 rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground"
+              className="btn-solid wire mt-4 rounded-sm px-3 py-2.5 font-medium"
             >
               IMPORT ANOTHER
             </button>
@@ -315,8 +343,11 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
                 <button
                   onClick={browseDocs}
                   disabled={browsing}
-                  className="wire mt-3 rounded-sm border border-border px-3 py-3 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-50"
+                  className="btn-solid wire mt-3 flex items-center justify-center gap-2 rounded-sm px-3 py-3.5 font-medium"
                 >
+                  <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
+                    <path d="M2 4.5a1 1 0 011-1h2.5l1.5 1.5H11a1 1 0 011 1v4.5a1 1 0 01-1 1H3a1 1 0 01-1-1z" />
+                  </svg>
                   {browsing ? 'FETCHING YOUR DOCS…' : 'BROWSE YOUR GOOGLE DOCS'}
                 </button>
               ) : (

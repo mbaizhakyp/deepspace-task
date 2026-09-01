@@ -132,6 +132,7 @@ async function importText(job: Job, ctx: JobContext, env: Env): Promise<unknown>
       y,
       origin: 'imported',
       authorName: userName ?? '',
+      tint: used % 4, // batch color: each import lands on its own paper stock
     })
     created++
     ctx.progress(

@@ -344,3 +344,17 @@ When: user request, round 7 ("give mbaizhakyp.job@gmail.com 20 credits, I'm test
 Decision: the platform has no grantable credits mechanism (CLI has no credits verb; UserCredits is platform-managed), and the app's only scarcity is the per-room import quota — so "20 credits" became: allowlisted tester emails get a 20-imports-per-room allowance in the shared quota gate (checkQuotaAndEnqueue), checked server-side by looking up the caller's users record — a client cannot claim tester status. Everyone else keeps 3 free / Pro unlimited.
 Beats: gifting Pro (hides the paywall behavior the tester is meant to see) and a stored credits ledger (schema + two counters for one QA account).
 Note: unverifiable by me — test accounts aren't allowlisted and prod won't get fake allowlist entries; the user confirms from the .job account.
+
+## D-042 · Round-8 UX: merged invite, batch paper stocks, themed dispatch with history
+When: user feedback round 8
+Decisions:
+- INVITE and the code chip merged into one fixed-width COPY INVITE (btn-solid) that copies link + "or enter code WR-XXXXXX" in one clipboard write; fixed width kills the label-swap reflow the user saw (the nav grew vertically when LINK COPIED wrapped).
+- Each import batch lands on its own paper stock: the job stamps `tint` (importCount % 4) on every card; four muted warm tints. Verified on prod: two imports → two visibly distinct card groups.
+- Import journey stages with no measurable signal (pulling, segmenting — the long one) show an indeterminate sweep bar + a real elapsed clock (WORKING · 00:07). Real motion and real time, never a fake percentage (D-018 held).
+- The dispatch panel is theme chrome now (bg-card/foreground — the user's ask); print still forces the paper palette so a PDF is always a light dispatch. Controls moved to the TOP (download without scrolling): HISTORY toggle, a solid download icon opening a format menu (.MD / PDF-print), CLOSE.
+- Summary history: every dispatch is kept in a new server-written `summaries` board collection (member read-only); the panel lists them and any past dispatch can be viewed and exported.
+
+## D-043 · Button contrast hierarchy: solid, orange, wire
+When: user feedback round 8 ("relevant journey buttons should be filled with a contrasting color — you decide")
+Decision: three tiers. (1) ORANGE stays reserved for each screen's one true ask (Summarize, Import to the board, Open a room, armed JOIN, Go Pro). (2) A new `.btn-solid` (foreground-on-background — auto-contrasts in both themes) fills secondary journey actions: COPY INVITE, BROWSE YOUR GOOGLE DOCS, IMPORT ANOTHER, the whole camera HUD (also enlarged), the dispatch download icon. (3) Wire-bordered stays for chrome/utilities (toolbar, CLOSE, HISTORY).
+Beats: filling everything (kills hierarchy) and more orange (violates the one-ask rule).

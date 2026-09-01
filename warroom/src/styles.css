@@ -275,7 +275,9 @@
   color-scheme: light;
 }
 
-/* ── Print: the dispatch sheet is the page (PRINT/PDF export, D-030) ── */
+/* ── Print: the dispatch sheet is the page (PRINT/PDF export, D-030).
+   The on-screen panel is theme-chrome (D-042); print forces the paper
+   palette so the PDF is always a light dispatch regardless of theme. ── */
 @media print {
   body * {
     visibility: hidden;
@@ -289,7 +291,38 @@
     inset: 0;
     width: 100%;
     box-shadow: none;
+    background: #f4f1e8 !important;
   }
+  .dispatch-sheet * {
+    color: #1a1a16 !important;
+    border-color: rgba(26, 26, 22, 0.3) !important;
+  }
+  .dispatch-sheet .no-print {
+    display: none !important;
+  }
+}
+
+/* Solid journey buttons (D-043): foreground-on-background auto-contrasts in
+   both editions (light chip on the night desk, ink chip on newsprint). The
+   single orange stays reserved for each screen's one true ask. */
+.btn-solid {
+  background-color: var(--color-foreground);
+  color: var(--color-background);
+}
+.btn-solid:hover {
+  filter: brightness(1.12);
+}
+.btn-solid:disabled {
+  opacity: 0.4;
+}
+
+/* Honest "working" bar for stages with no measurable progress */
+@keyframes indeterminate-slide {
+  from { transform: translateX(-110%); }
+  to { transform: translateX(410%); }
+}
+.indeterminate {
+  animation: indeterminate-slide 1.5s ease-in-out infinite;
 }
 
 /* ── Warroom board utilities ─────────────────────────────────────────── */

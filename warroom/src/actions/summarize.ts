@@ -81,9 +81,17 @@ export const summarize: ActionHandler<Env> = async ({ userId, params, tools }) =
   const summary = parseSummary(raw)
   if (!summary) return { success: false, error: 'summary came back malformed — try again' }
 
-  await t.update('rooms', roomId, { summary, summaryAt: Date.now() })
+  const at = Date.now()
+  await t.update('rooms', roomId, { summary, summaryAt: at })
+  // dispatch history (D-042): every summary is kept, not just the latest
+  await board.create('summaries', {
+    at,
+    headline: summary.headline,
+    json: summary,
+    authorName: userName,
+  })
   await board.create('events', {
-    at: Date.now(),
+    at,
     text: `SUMMARY REQUESTED · ${userName.toUpperCase()}`,
   })
   return { success: true, data: { summary } }

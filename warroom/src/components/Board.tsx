@@ -24,7 +24,11 @@ export type CardData = {
   y: number
   origin?: string
   authorName?: string
+  tint?: number
 }
+
+// per-batch paper stocks (D-042): warm, muted, unmistakably different rows
+const BATCH_TINTS = ['#ece3cc', '#e2e7d2', '#ecdfd6', '#dde6e4']
 type SettingsData = { facilitatorId: string; frozenBy?: string | null; frozenByName?: string | null }
 type EventData = { at: number; text: string }
 
@@ -279,27 +283,19 @@ export default function Board({
     }
   }
 
-  const [codeCopied, setCodeCopied] = useState(false)
-  async function copyCode() {
-    if (!roomCode) return
-    try {
-      await navigator.clipboard.writeText(`WR-${roomCode}`)
-      setCodeCopied(true)
-      setTimeout(() => setCodeCopied(false), 2000)
-    } catch {
-      warning('Could not copy', `The code is WR-${roomCode}`)
-    }
-  }
-
   const [invited, setInvited] = useState(false)
   async function copyInvite() {
-    // the room URL is the invite — anyone signed in who opens it becomes a member
+    // one invite, both keys: the link (open it → you're in) and the code
+    // (type it in the lobby). Combined per user feedback (D-042).
+    const invite = roomCode
+      ? `Join my war room "${roomName}": ${window.location.href} · or enter code WR-${roomCode}`
+      : window.location.href
     try {
-      await navigator.clipboard.writeText(window.location.href)
+      await navigator.clipboard.writeText(invite)
       setInvited(true)
       setTimeout(() => setInvited(false), 2000)
     } catch {
-      warning('Could not copy', 'Copy the address bar URL instead')
+      warning('Could not copy', roomCode ? `The code is WR-${roomCode}` : 'Copy the address bar URL instead')
     }
   }
 
@@ -376,15 +372,6 @@ export default function Board({
           ← LOBBY
         </Link>
         <h1 className="font-serif text-2xl text-foreground">{roomName}</h1>
-        {roomCode && (
-          <button
-            onClick={copyCode}
-            title="Copy the room code"
-            className="wire rounded-sm border border-border px-2 py-1 text-[10px] text-chrome/80 hover:border-chrome hover:text-foreground"
-          >
-            {codeCopied ? 'COPIED' : `WR-${roomCode}`}
-          </button>
-        )}
         <div className="flex-1" />
         <div className="flex items-center pl-1">
           {[{ userId: user?.id ?? 'me', userName: user?.fullName ?? 'me' }, ...peers].map((p) => (
@@ -408,12 +395,14 @@ export default function Board({
         </div>
         {/* room controls | board actions — glyphs differentiate at a glance
             without breaking the wire voice (no emoji in chrome) */}
+        {/* fixed width: the label swap must never reflow the header (D-042) */}
         <button
           onClick={copyInvite}
-          className="wire flex items-center gap-1.5 rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground"
+          title={roomCode ? `Copies the room link and code WR-${roomCode}` : 'Copies the room link'}
+          className="btn-solid wire flex w-32 flex-none items-center justify-center gap-1.5 rounded-sm px-3 py-2 font-medium"
         >
           <Glyph name="invite" />
-          {invited ? 'LINK COPIED' : 'INVITE'}
+          {invited ? 'COPIED ✓' : 'COPY INVITE'}
         </button>
         {isFacilitator && (
           <button
@@ -574,25 +563,26 @@ export default function Board({
         })}
         </div>
 
-        {/* camera HUD — screen-fixed, like the wire log */}
+        {/* camera HUD — screen-fixed, like the wire log; solid fill so the
+            controls read on any board (D-043) */}
         <div className="wire absolute bottom-4 right-5 z-30 flex items-center gap-2 text-chrome">
           <button
             onClick={exportBoard}
-            className="mr-1 rounded-sm border border-border px-2 py-[5px] hover:border-chrome hover:text-foreground"
+            className="btn-solid mr-1 rounded-sm px-2.5 py-2"
             title="Download the board as Markdown"
             aria-label="Download the board as Markdown"
           >
-            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
+            <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.4" strokeLinecap="round" aria-hidden>
               <path d="M7 1.5V8M4.5 5.5L7 8l2.5-2.5" />
               <path d="M1.5 9.5v2a1 1 0 001 1h9a1 1 0 001-1v-2" />
             </svg>
           </button>
-          <button onClick={() => zoomBy(1 / 1.25)} className="rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" aria-label="Zoom out">−</button>
+          <button onClick={() => zoomBy(1 / 1.25)} className="btn-solid rounded-sm px-3 py-1.5 text-[13px] leading-[14px]" aria-label="Zoom out">−</button>
           <span className="w-10 text-center tabular-nums">{Math.round(view.scale * 100)}%</span>
-          <button onClick={() => zoomBy(1.25)} className="rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" aria-label="Zoom in">+</button>
+          <button onClick={() => zoomBy(1.25)} className="btn-solid rounded-sm px-3 py-1.5 text-[13px] leading-[14px]" aria-label="Zoom in">+</button>
           {/* "RESET" read as "wipe the board" — it frames, so say so (D-032) */}
-          <button onClick={fitAll} className="ml-1 flex items-center gap-1.5 rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" title="Bring every card and poll into view">
-            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden>
+          <button onClick={fitAll} className="btn-solid ml-1 flex items-center gap-1.5 rounded-sm px-3 py-2" title="Bring every card and poll into view">
+            <svg width="13" height="13" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
               <path d="M1 3.5V1h2.5M8.5 1H11v2.5M11 8.5V11H8.5M3.5 11H1V8.5" />
               <circle cx="6" cy="6" r="1" fill="currentColor" stroke="none" />
             </svg>
@@ -709,9 +699,16 @@ function BoardCard({
 
   return (
     <div
-      // imported cards land on manila stock — wire dispatches vs. house paper
-      className={`card-drop absolute w-64 rounded-sm p-4 shadow-[0_2px_6px_rgba(26,26,22,.35)] ${data.origin === 'imported' ? 'bg-manila' : 'bg-paper'} ${shake ? 'locked-shake' : ''} ${dragPos ? 'z-30' : 'z-10'}`}
-      style={{ left: x, top: y, transform: `rotate(${rotationFor(id)}deg)` }}
+      // imported cards land on batch-colored stock (D-042): every import run
+      // is a different paper, so batches read as groups at board distance
+      className={`card-drop absolute w-64 rounded-sm bg-paper p-4 shadow-[0_2px_6px_rgba(26,26,22,.35)] ${shake ? 'locked-shake' : ''} ${dragPos ? 'z-30' : 'z-10'}`}
+      style={{
+        left: x,
+        top: y,
+        transform: `rotate(${rotationFor(id)}deg)`,
+        backgroundColor:
+          data.origin === 'imported' ? BATCH_TINTS[(data.tint ?? 0) % BATCH_TINTS.length] : undefined,
+      }}
       onDoubleClick={() => {
         if (locked) return
         setDraftTitle(data.title)
