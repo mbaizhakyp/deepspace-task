@@ -195,3 +195,9 @@ When: planning
 Decision: each board is its own DO room with its own members/cards/polls; app scope holds only the rooms registry + users.
 Why: room-scoped RBAC gives "user A provably cannot read board B" for free; mirrors taskspace's proven team pattern; isolates board data at the DO level.
 Beats: all boards in app scope with a BoardId column — one DO hotspot and permission filtering we'd have to hand-write.
+
+## D-021 · Landing hook: hand-built miniature Room, not generated imagery
+When: post-submission polish (user asked about Higgsfield for the landing)
+Decision: elevate the landing with the brief's missing "live-looking product shot of the Room" (design-brief §6.6) — a CSS miniature board that assembles itself (staggered card-drop, live poll fillbars, breathing presence, cycling wire log) built from the app's own animation utilities. Declined AI-generated (Higgsfield) hero imagery.
+Why: the identity is typographic restraint; the strongest hook for a tool is the tool. Zero new dependencies/assets — every animation class already existed for the real board.
+Beats: a generated cinematic hero — the one element that would make a distinctive page read generic, plus an asset pipeline outside my hands (needs the user's Higgsfield account).
