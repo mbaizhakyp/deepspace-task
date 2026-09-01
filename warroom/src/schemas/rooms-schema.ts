@@ -15,6 +15,8 @@ export const roomsSchema: CollectionSchema = {
   name: 'rooms',
   columns: [
     { name: 'name', storage: 'text', interpretation: 'plain', required: true },
+    // short join code (6 chars, unambiguous alphabet) — professional invites
+    { name: 'code', storage: 'text', interpretation: 'plain' },
     { name: 'memberIds', storage: 'text', interpretation: { kind: 'json' } },
     { name: 'facilitatorId', storage: 'text', interpretation: 'plain', immutable: true },
     { name: 'importCount', storage: 'number', interpretation: 'plain', default: 0 },

@@ -318,3 +318,17 @@ When: user feedback round 5. The HUD's EXPORT .MD text became the tray-download 
 ## D-038 · Yearly billing exposed: MONTHLY/YEARLY toggle on the Pro card
 When: user feedback round 5 ("no way to choose annual plan")
 Decision: subscriptions.ts already declared yearlyCents (both Stripe Prices existed since Connect sync) — the page just never offered the choice. A MONTHLY/YEARLY toggle switches the displayed price ($9/mo ↔ $90/yr, "two months free") and passes { interval } to subscribe(). Verified on prod: yearly checkout reaches checkout.stripe.com showing $90.00/year.
+
+## D-039 · Room codes: WR-XXXXXX join codes alongside links
+When: user feedback round 6 ("codes instead of links — more professional")
+Decision: every room gets a 6-char code (unambiguous alphabet, no I/L/O/0/1 — codes get read aloud) shown as a click-to-copy WR- chip in the room header. The lobby join field takes a code, a link, or a bare id (`parseJoinInput`, unit-tested; an explicit WR- prefix never falls back to the id path). Resolution happens server-side in join-room — the registry isn't readable by non-members, so the RBAC-off action scans for the code and joins in one call. Rooms created before codes get one lazily on the next join. Links still work — codes are additive.
+Beats: replacing links (a URL you can paste into chat is the lowest-friction invite; professional ≠ fewer options).
+
+## D-040 · Join button lights orange when the input parses; lobby LEAVE; members vs online
+When: user feedback round 6
+Decisions: (a) JOIN turns solid orange the moment the field holds a valid code/link — the "you may go" affordance. (b) Member rows in the lobby get the two-step LEAVE (same arm pattern); this is also the remedy for "I can still see Harsh's room": opening a room link JOINS you (the invite model working as designed), so the .job account became a member by visiting once — now it can leave from either the lobby or the room. (c) The room header shows both facts: "N ONLINE · M MEMBERS" — presence and membership are different numbers and both matter.
+
+## B-015 · After leaving a room, its lobby row lingered for the leaver · FIXED
+When: D-039/D-040 verification (focused two-user prod test — the row survived 6s with the room still alive)
+Root cause: leaving revokes YOUR read access to the room record, so the server cannot push the membership update to you — your client keeps rendering its last-readable copy, and no state change ever evicts it. Scoped-subscription staleness, invisible to happy-path tests because a reload fixes it.
+Fix: both leave paths record the id in a session-local set the lobby filters against (plus a render tick — a module Set doesn't re-render React). A full reload needs none of this; server scoping omits the room. · Verified: row gone immediately post-leave, room still alive.

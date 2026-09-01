@@ -10,11 +10,14 @@ import { RecordScope, useAuthUser, useQuery } from 'deepspace'
 import { boardSchemas } from '../../../../schemas'
 import { callAction } from '../../../../lib/actions-client'
 import Board from '../../../../components/Board'
+import { parseMemberIds } from '../../../../actions/rooms'
 
 import type { Summary } from '../../../../actions/summarize'
 
 type Room = {
   name: string
+  code?: string
+  memberIds?: unknown
   facilitatorId: string
   summary?: unknown
   summaryAt?: number | null
@@ -83,6 +86,8 @@ export default function RoomPage() {
       <Board
         roomId={id}
         roomName={room.data.name}
+        roomCode={room.data.code ?? null}
+        memberCount={parseMemberIds(room.data.memberIds).length}
         facilitatorId={room.data.facilitatorId}
         summary={parseSummary(room.data.summary)}
         summaryAt={room.data.summaryAt ?? null}

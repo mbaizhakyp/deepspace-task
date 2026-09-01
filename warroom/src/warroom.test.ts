@@ -122,6 +122,24 @@ describe('board camera (pan/zoom math, D-022)', () => {
   })
 })
 
+describe('parseJoinInput (lobby join field: url, id, or short code)', () => {
+  it('extracts the id from a full room URL', async () => {
+    const { parseJoinInput } = await import('./lib/join-code')
+    expect(parseJoinInput('https://warroomhq.app.space/room/abc123XYZ_-')).toEqual({ roomId: 'abc123XYZ_-' })
+  })
+  it('recognizes 6-char codes, with or without the WR- prefix, any case', async () => {
+    const { parseJoinInput } = await import('./lib/join-code')
+    expect(parseJoinInput('WR-K7M2QX')).toEqual({ code: 'K7M2QX' })
+    expect(parseJoinInput('k7m2qx')).toEqual({ code: 'K7M2QX' })
+  })
+  it('treats long tokens as record ids and rejects junk', async () => {
+    const { parseJoinInput } = await import('./lib/join-code')
+    expect(parseJoinInput('rec_0123456789abcdef')).toEqual({ roomId: 'rec_0123456789abcdef' })
+    expect(parseJoinInput('WR-K7M2Q1')).toBeNull() // 1 not in the alphabet, too short for an id
+    expect(parseJoinInput('  ')).toBeNull()
+  })
+})
+
 describe('parseMemberIds (stored membership json)', () => {
   it('accepts arrays and JSON strings', () => {
     expect(parseMemberIds(['a', 'b'])).toEqual(['a', 'b'])

@@ -13,9 +13,20 @@ import type { AppActionTools } from '../server/action-routes'
 
 type RoomData = {
   name: string
+  code?: string
   memberIds: unknown
   facilitatorId: string
   importCount?: number
+}
+
+// no I/L/O/0/1 — codes get read aloud and typed. 31^6 ≈ 887M combinations;
+// ponytail: no uniqueness check at this scale, add a collision retry if the
+// app ever hosts millions of rooms.
+const CODE_ALPHABET = 'ABCDEFGHJKMNPQRSTUVWXYZ23456789'
+function makeRoomCode(): string {
+  let c = ''
+  for (let i = 0; i < 6; i++) c += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)]
+  return c
 }
 
 export function parseMemberIds(raw: unknown): string[] {
@@ -48,6 +59,7 @@ export const createRoom: ActionHandler<Env> = async ({ userId, params, tools }) 
 
   const created = await t.create('rooms', {
     name,
+    code: makeRoomCode(),
     memberIds: [userId],
     facilitatorId: userId,
     importCount: 0,
@@ -69,17 +81,33 @@ export const createRoom: ActionHandler<Env> = async ({ userId, params, tools }) 
 
 export const joinRoom: ActionHandler<Env> = async ({ userId, params, tools }) => {
   const t = tools as AppActionTools
-  const roomId = typeof params.roomId === 'string' ? params.roomId : ''
+  let roomId = typeof params.roomId === 'string' ? params.roomId : ''
+  const code = typeof params.code === 'string' ? params.code.toUpperCase().slice(0, 12) : ''
   const userName = typeof params.userName === 'string' ? params.userName.slice(0, 80) : 'someone'
-  if (!roomId) return { success: false, error: 'roomId required' }
+  if (!roomId && !code) return { success: false, error: 'roomId or code required' }
 
-  const room = await getRoom(t, roomId)
+  let room = roomId ? await getRoom(t, roomId) : null
+  if (!roomId) {
+    // join by short code: this action runs RBAC-off, so it can scan the
+    // registry a non-member can't read. ponytail: linear scan over one page,
+    // fine below 500 rooms; index on col_code if that ever changes.
+    const all = await t.query<RoomData>('rooms', { limit: 500 })
+    const hit = (all.success ? (all.data?.records ?? []) : []).find(
+      (r) => (r.data.code ?? '').toUpperCase() === code,
+    )
+    if (!hit) return { success: false, error: 'no room with that code' }
+    roomId = hit.recordId
+    room = hit
+  }
   if (!room) return { success: false, error: 'room not found' }
+
+  // lazy backfill: rooms created before codes existed get one on next join
+  if (!room.data.code) await t.update('rooms', roomId, { code: makeRoomCode() })
 
   const members = parseMemberIds(room.data.memberIds)
   if (members.includes(userId)) return { success: true, data: { roomId, already: true } }
 
-  // Join-by-link is open to any signed-in user (REQUIREMENTS G2).
+  // Join-by-link/code is open to any signed-in user (REQUIREMENTS G2).
   await t.update('rooms', roomId, { memberIds: [...members, userId] })
   await logEvent(t, roomId, `${userName.toUpperCase()} JOINED`)
   return { success: true, data: { roomId } }

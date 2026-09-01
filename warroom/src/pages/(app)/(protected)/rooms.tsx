@@ -10,17 +10,10 @@ import { useAuthUser, useQuery, useUsers } from 'deepspace'
 import { Button, Input, useToast } from '@/components/ui'
 import { callAction } from '../../../lib/actions-client'
 import { parseMemberIds } from '../../../actions/rooms'
+import { parseJoinInput } from '../../../lib/join-code'
+import { leftRooms } from '../../../lib/left-rooms'
 
 type Room = { name: string; facilitatorId: string; memberIds?: unknown }
-
-/** Accepts a full room URL or a bare room code (the id in the link). */
-export function parseRoomCode(input: string): string | null {
-  const s = input.trim()
-  if (!s) return null
-  const fromUrl = s.match(/\/room\/([A-Za-z0-9_-]+)/)
-  if (fromUrl) return fromUrl[1]
-  return /^[A-Za-z0-9_-]{6,}$/.test(s) ? s : null
-}
 
 export default function RoomsPage() {
   const { user } = useAuthUser()
@@ -31,7 +24,9 @@ export default function RoomsPage() {
   // too; admin oversight lives in /audit, not the lobby.
   const rooms = allRooms.filter(
     (r) =>
-      r.data.facilitatorId === user?.id || parseMemberIds(r.data.memberIds).includes(user?.id ?? ''),
+      !leftRooms.has(r.recordId) && // B-015: our own leave can't sync back to us
+      (r.data.facilitatorId === user?.id ||
+        parseMemberIds(r.data.memberIds).includes(user?.id ?? '')),
   )
   // roster (public identity) — lets rows say WHOSE room it is; two rooms may
   // legitimately share a name (B-005), so name alone must never be the label
@@ -59,10 +54,38 @@ export default function RoomsPage() {
     else error('Could not open the room', res.error)
   }
 
-  function joinByCode() {
-    const id = parseRoomCode(joinCode)
-    if (id) navigate(`/room/${id}`)
+  const [joining, setJoining] = useState(false)
+  async function joinByCode() {
+    const parsed = parseJoinInput(joinCode)
+    if (!parsed || joining) return
+    if ('roomId' in parsed) return navigate(`/room/${parsed.roomId}`)
+    // short code: the join-room action resolves it server-side (the registry
+    // isn't readable by non-members) and joins in the same call
+    setJoining(true)
+    const res = await callAction<{ roomId?: string }>('join-room', {
+      code: parsed.code,
+      userName: user?.fullName ?? '',
+    })
+    setJoining(false)
+    if (res.success && res.data?.roomId) navigate(`/room/${res.data.roomId}`)
+    else error('Could not join', res.error ?? 'no room with that code')
   }
+
+  // members can leave a room straight from the lobby (same two-step arm)
+  async function leaveRow(roomId: string) {
+    if (armedDelete !== roomId) {
+      setArmedDelete(roomId)
+      setTimeout(() => setArmedDelete((cur) => (cur === roomId ? null : cur)), 2500)
+      return
+    }
+    setArmedDelete(null)
+    const res = await callAction('leave-room', { roomId, userName: user?.fullName ?? '' })
+    if (res.success) {
+      leftRooms.add(roomId) // hide it now; sync can't (B-015)
+      setLeftTick((t) => t + 1) // module Set doesn't re-render on its own
+    } else error('Could not leave', res.error)
+  }
+  const [, setLeftTick] = useState(0)
 
   // No popups (user preference): destructive room delete uses an inline
   // two-step — first click arms the button ("SURE?"), second click deletes,
@@ -141,15 +164,21 @@ export default function RoomsPage() {
               value={joinCode}
               onChange={(e) => setJoinCode(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && joinByCode()}
-              placeholder="Paste the room link or code you were sent"
+              placeholder="Room code (WR-XXXXXX) or the room link"
               className="flex-1"
             />
+            {/* the button lights orange the moment the input parses — the
+                "you may go" signal (user feedback, round 6) */}
             <button
               onClick={joinByCode}
-              disabled={!parseRoomCode(joinCode)}
-              className="wire rounded-sm border border-border px-4 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-40"
+              disabled={!parseJoinInput(joinCode) || joining}
+              className={`wire rounded-sm px-5 transition-colors ${
+                parseJoinInput(joinCode)
+                  ? 'bg-primary font-semibold text-primary-foreground hover:brightness-110'
+                  : 'border border-border text-chrome/50'
+              }`}
             >
-              JOIN
+              {joining ? 'JOINING…' : 'JOIN'}
             </button>
           </div>
         )}
@@ -188,19 +217,17 @@ export default function RoomsPage() {
                 </span>
                 <span className="wire text-chrome">{mine ? 'FACILITATOR' : 'MEMBER'}</span>
               </button>
-              {mine && (
-                <button
-                  onClick={() => deleteRoom(r.recordId)}
-                  className={`wire group-hover:inline ${
-                    armedDelete === r.recordId
-                      ? 'inline text-destructive'
-                      : 'hidden text-chrome hover:text-destructive'
-                  }`}
-                  aria-label={`Delete ${r.data.name}`}
-                >
-                  {armedDelete === r.recordId ? 'SURE?' : 'DELETE'}
-                </button>
-              )}
+              <button
+                onClick={() => (mine ? deleteRoom(r.recordId) : leaveRow(r.recordId))}
+                className={`wire group-hover:inline ${
+                  armedDelete === r.recordId
+                    ? 'inline text-destructive'
+                    : 'hidden text-chrome hover:text-destructive'
+                }`}
+                aria-label={`${mine ? 'Delete' : 'Leave'} ${r.data.name}`}
+              >
+                {armedDelete === r.recordId ? 'SURE?' : mine ? 'DELETE' : 'LEAVE'}
+              </button>
             </div>
           )
         })}

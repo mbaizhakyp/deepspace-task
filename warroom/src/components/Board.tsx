@@ -11,6 +11,7 @@ import { getUserColor, useAuthUser, useJobs, useMutations, usePresenceRoom, useQ
 import { Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
 import { fitView, gridSpacing, toWorld, zoomView, type View } from '../lib/camera'
+import { leftRooms } from '../lib/left-rooms'
 import { parseOptions, PollCard, type PollData, type VoteData } from './PollCard'
 import { ImportPanel } from './ImportPanel'
 import { SummaryPanel } from './SummaryPanel'
@@ -32,12 +33,16 @@ type EventData = { at: number; text: string }
 export default function Board({
   roomId,
   roomName,
+  roomCode,
+  memberCount,
   facilitatorId,
   summary,
   summaryAt,
 }: {
   roomId: string
   roomName: string
+  roomCode: string | null
+  memberCount: number
   facilitatorId: string
   summary: Summary | null
   summaryAt: number | null
@@ -274,6 +279,18 @@ export default function Board({
     }
   }
 
+  const [codeCopied, setCodeCopied] = useState(false)
+  async function copyCode() {
+    if (!roomCode) return
+    try {
+      await navigator.clipboard.writeText(`WR-${roomCode}`)
+      setCodeCopied(true)
+      setTimeout(() => setCodeCopied(false), 2000)
+    } catch {
+      warning('Could not copy', `The code is WR-${roomCode}`)
+    }
+  }
+
   const [invited, setInvited] = useState(false)
   async function copyInvite() {
     // the room URL is the invite — anyone signed in who opens it becomes a member
@@ -299,8 +316,10 @@ export default function Board({
     const res = isFacilitator
       ? await callAction('delete-room', { roomId })
       : await callAction('leave-room', { roomId, userName: user?.fullName ?? '' })
-    if (res.success) navigate('/rooms')
-    else warning(isFacilitator ? 'Could not delete the room' : 'Could not leave', res.error)
+    if (res.success) {
+      if (!isFacilitator) leftRooms.add(roomId) // B-015: our leave can't sync back to us
+      navigate('/rooms')
+    } else warning(isFacilitator ? 'Could not delete the room' : 'Could not leave', res.error)
   }
 
   // ── board export: the whole table as Markdown (cards, polls, tallies) ──
@@ -357,6 +376,15 @@ export default function Board({
           ← LOBBY
         </Link>
         <h1 className="font-serif text-2xl text-foreground">{roomName}</h1>
+        {roomCode && (
+          <button
+            onClick={copyCode}
+            title="Copy the room code"
+            className="wire rounded-sm border border-border px-2 py-1 text-[10px] text-chrome/80 hover:border-chrome hover:text-foreground"
+          >
+            {codeCopied ? 'COPIED' : `WR-${roomCode}`}
+          </button>
+        )}
         <div className="flex-1" />
         <div className="flex items-center pl-1">
           {[{ userId: user?.id ?? 'me', userName: user?.fullName ?? 'me' }, ...peers].map((p) => (
@@ -370,9 +398,13 @@ export default function Board({
             </div>
           ))}
         </div>
+        {/* who's HERE vs who's IN — different facts, both shown */}
         <div className="flex items-center gap-1.5">
           <span className="h-1.5 w-1.5 rounded-full bg-live breathe" />
-          <span className="wire text-chrome">{peers.length + 1} PRESENT</span>
+          <span className="wire text-chrome">
+            {peers.length + 1} ONLINE
+            <span className="text-chrome/60"> · {Math.max(memberCount, peers.length + 1)} MEMBERS</span>
+          </span>
         </div>
         {/* room controls | board actions — glyphs differentiate at a glance
             without breaking the wire voice (no emoji in chrome) */}
