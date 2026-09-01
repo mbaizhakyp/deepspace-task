@@ -387,3 +387,11 @@ Decisions:
 - Walkthrough rebuilt as ONE continuous tour: a centered welcome modal (page dimmed, serif "Learn the room in 30 seconds.", big orange Start, deliberately tiny skip) → passive lobby steps → INTERACTIVE steps where the user actually clicks + NEW ROOM, names the room, and presses Open a room (the tour shows "YOUR TURN" and advances on their action, not a Next) → resumes inside the room via a sessionStorage live-flag across the navigation → six room steps → done (localStorage). Specs seed the done-flag; the modal caught collab.spec on /home (signed-in redirect), which is how we know it really blocks everything.
 - Deletes are a red trash icon (rooms in lobby + in-room, polls) with the two-step SURE? arm kept. LEAVE stays text — leaving isn't destruction.
 - btn-solid retoned from foreground-inversion (black chips in day — the user's complaint) to PAPER-AND-INK: per convention (Material tonal / shadcn secondary), secondary emphasis is a tonal surface, and ours is the product's own artifact material — warm paper chips in both editions. Orange remains the single primary ask.
+
+## D-047 · Round-11 walkthrough polish: auto-typed name, demo clips in steps, theme-tracking chips
+When: user feedback round 11
+Decisions:
+- The walkthrough's create step no longer spotlights a dimmed form: the tour TYPES the demo name itself ("Q3 launch plan", typewriter, 45ms/char) so "Open a room" is already lit when the spotlight lands on it, and the callout just says press it. (Root cause of the complaint: the spotlight's dim covered the button, reading as disabled.)
+- Tour steps can carry a short looping demo clip: three ~550px webm videos (import, poll, summarize) recorded with Playwright against prod itself, served from /public/tour (~575KB total), autoplay-muted inside the callout. webm in a <video> beats GIF: smaller, sharper, no conversion tooling.
+- The solid button tier now tracks the theme via new --color-btn tokens: warm paper chips on the night desk, pressed deep-tan (#c6bfa7) chips on newsprint — the user's "always white" complaint; verified computed backgrounds differ per theme on prod.
+Also: the unused-eslint-disable → vite-overlay → suite-blocked failure recurred (B-010's pattern, caught by the suite again) — directive removed.

@@ -14,23 +14,7 @@ import { parseJoinInput } from '../../../lib/join-code'
 import { leftRooms } from '../../../lib/left-rooms'
 import { WalkthroughWelcome } from '../../../components/Tour'
 
-const LOBBY_TOUR = [
-  { anchor: 'nav', title: 'THE DESK', body: 'Rooms is your lobby, Pricing the plans, Settings your account. The wire clock is always on.' },
-  { anchor: 'theme', title: 'DAY / NIGHT', body: 'Flip between the night desk and the day edition any time — your cards stay paper either way.' },
-  { anchor: 'join', title: 'INVITED?', body: 'Teammates join by pasting a room link or typing a WR- code here.' },
-  {
-    anchor: 'new-room',
-    title: 'YOUR TURN',
-    body: 'Click + NEW ROOM to start your first war room.',
-    advanceWhen: () => !!document.querySelector('[data-tour="room-name"]'),
-  },
-  {
-    anchor: 'room-name',
-    title: 'NAME THE DECISION',
-    body: "Type a name — 'Q3 launch plan' — and press Open a room. The tour continues inside.",
-    advanceWhen: () => window.location.pathname.startsWith('/room/'),
-  },
-]
+
 
 type Room = { name: string; facilitatorId: string; memberIds?: unknown }
 
@@ -134,6 +118,40 @@ export default function RoomsPage() {
     if (!res.success) error('Could not delete the room', res.error)
   }
 
+  // Walkthrough steps (D-047): the create leg is fully guided — the tour
+  // clicks nothing itself, but it TYPES the demo name so the Open button is
+  // already lit when the spotlight lands on it (a dimmed target read as
+  // disabled, per user feedback).
+  function typeDemoName() {
+    const target = "Q3 launch plan"
+    setIntent('create')
+    setName('')
+    let i = 0
+    const id = setInterval(() => {
+      i++
+      setName(target.slice(0, i))
+      if (i >= target.length) clearInterval(id)
+    }, 45)
+  }
+  const lobbyTour = [
+    { anchor: 'nav', title: 'THE DESK', body: 'Rooms is your lobby, Pricing the plans, Settings your account. The wire clock is always on.' },
+    { anchor: 'theme', title: 'DAY / NIGHT', body: 'Flip between the night desk and the day edition any time — your cards stay paper either way.' },
+    { anchor: 'join', title: 'INVITED?', body: 'Teammates join by pasting a room link or typing a WR- code here.' },
+    {
+      anchor: 'new-room',
+      title: 'YOUR TURN',
+      body: 'Click + NEW ROOM to start your first war room.',
+      advanceWhen: () => !!document.querySelector('[data-tour="open-room"]'),
+    },
+    {
+      anchor: 'open-room',
+      title: 'OPEN IT',
+      body: "We typed a name for you — press Open a room. The tour continues inside.",
+      onEnter: typeDemoName,
+      advanceWhen: () => window.location.pathname.startsWith('/room/'),
+    },
+  ]
+
   // one intent at a time (user feedback): the lobby leads with two buttons;
   // the matching field appears only once you've picked an intent
   const [intent, setIntent] = useState<'none' | 'create' | 'join'>('none')
@@ -185,7 +203,7 @@ export default function RoomsPage() {
               placeholder="Name a room — 'Q3 launch plan'"
               className="flex-1"
             />
-            <Button onClick={create} disabled={creating || !name.trim()}>
+            <Button data-tour="open-room" onClick={create} disabled={creating || !name.trim()}>
               Open a room
             </Button>
           </div>
@@ -219,7 +237,7 @@ export default function RoomsPage() {
           </div>
         )}
 
-        <WalkthroughWelcome steps={LOBBY_TOUR} />
+        <WalkthroughWelcome steps={lobbyTour} />
 
         <div className="wire mt-10 border-b border-border pb-1 text-[10px] text-chrome">
           YOUR ROOMS

@@ -21,11 +21,11 @@ import { SummaryPanel } from './SummaryPanel'
 import type { Summary } from '../actions/summarize'
 
 const ROOM_TOUR = [
-  { anchor: 'import', title: 'BRING THE DOCUMENT', body: 'Import is where meetings start: browse your Google Docs or paste anything — the AI splits it into cards that land live for everyone.' },
-  { anchor: 'poll', title: 'DECIDE', body: 'Contested point? Open a poll. One vote per person — enforced by the database, not the buttons.' },
+  { anchor: 'import', title: 'BRING THE DOCUMENT', body: 'Import is where meetings start: browse your Google Docs or paste anything — the AI splits it into cards that land live for everyone.', media: '/tour/import.webm' },
+  { anchor: 'poll', title: 'DECIDE', body: 'Contested point? Open a poll. One vote per person — enforced by the database, not the buttons.', media: '/tour/poll.webm' },
   { anchor: 'card', title: 'ADD YOUR OWN', body: 'Drop a blank card wherever you\'re looking. Double-click any card to write on it; drag to arrange.' },
   { anchor: 'invite', title: 'GET THE TEAM IN', body: 'That IS the room code — click to copy it. Teammates enter it under JOIN BY LINK (or just open your room URL).' },
-  { anchor: 'summarize', title: 'FILE THE DISPATCH', body: 'When it\'s decided, the AI writes "what was decided" — exportable as Markdown or PDF, with full history.' },
+  { anchor: 'summarize', title: 'FILE THE DISPATCH', body: 'When it\'s decided, the AI writes "what was decided" — exportable as Markdown or PDF, with full history.', media: '/tour/summary.webm' },
   { anchor: 'hud', title: 'THE CAMERA', body: 'Drag empty ground to pan, pinch to zoom, FIT ALL to frame everything. The download icon exports the whole board.' },
 ]
 

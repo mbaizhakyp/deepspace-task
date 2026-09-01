@@ -43,6 +43,10 @@
 
   /* Artifact (paper) + signal tokens */
   --color-paper: #f4f1e8;
+  /* solid-tier button surface (D-047): tracks the theme — paper chip on the
+     night desk, pressed deep-tan chip on newsprint */
+  --color-btn: #f4f1e8;
+  --color-btn-ink: #1a1a16;
   --color-manila: #ece3cc; /* imported cards — wire dispatches on manila stock */
   --color-ink: #1a1a16;
   --color-ink-muted: #6e6a5e;
@@ -272,6 +276,8 @@
   --color-input: #a9a28b;
   --color-chrome: #55524a;
   --color-live: #15803d; /* phosphor green fails on newsprint; forest reads */
+  --color-btn: #c6bfa7;
+  --color-btn-ink: #1a1a16;
   color-scheme: light;
 }
 
@@ -309,8 +315,8 @@
    material: warm paper, ink text — glows on the night desk, sits softly
    raised on newsprint. Orange stays the one true ask. */
 .btn-solid {
-  background-color: var(--color-paper);
-  color: var(--color-ink);
+  background-color: var(--color-btn);
+  color: var(--color-btn-ink);
   border: 1px solid rgba(26, 26, 22, 0.18);
 }
 .btn-solid:hover {

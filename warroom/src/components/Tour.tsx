@@ -17,6 +17,10 @@ export type TourStep = {
   body: string
   /** Interactive step: no Next button — polls until the user's action makes this true. */
   advanceWhen?: () => boolean
+  /** Runs once when the step becomes active (e.g. auto-typing a field). */
+  onEnter?: () => void
+  /** Short looping clip demonstrating the action (public asset path). */
+  media?: string
 }
 
 const DONE_KEY = 'warroom-tour2'
@@ -56,6 +60,10 @@ export function Tour({ steps, onEnd }: { steps: TourStep[]; onEnd: () => void })
   const [idx, setIdx] = useState(0)
   const [rect, setRect] = useState<DOMRect | null>(null)
   const step = steps[idx]
+
+  useEffect(() => {
+    step.onEnter?.()
+  }, [idx])
 
   useEffect(() => {
     const measure = () => {
@@ -113,6 +121,16 @@ export function Tour({ steps, onEnd }: { steps: TourStep[]; onEnd: () => void })
           {idx + 1} / {steps.length} · {step.title}
         </div>
         <p className="mt-2 text-[13px] leading-relaxed text-foreground">{step.body}</p>
+        {step.media && (
+          <video
+            src={step.media}
+            autoPlay
+            loop
+            muted
+            playsInline
+            className="mt-3 w-full rounded-sm border border-border"
+          />
+        )}
         <div className="mt-4 flex items-center justify-between">
           <button onClick={onEnd} className="wire text-[9px] text-chrome/50 hover:text-chrome">
             skip
