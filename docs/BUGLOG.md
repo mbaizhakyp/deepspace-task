@@ -300,3 +300,21 @@ Decision: nav grows to h-16 with the serif wordmark at display size; inside /roo
 When: user completed Connect onboarding at /earnings (their Stripe identity — flagged as user-only work)
 Verified: redeploy shows "Synced 1 plan to Stripe" with no owner_connect_not_ready warning; a prod probe as a test account clicked Go Pro and landed on checkout.stripe.com (session created, purchase deliberately NOT completed — no card entered). The free-tier gate (3 imports/room, forged-enqueue-proof) was already adversarially verified; entitlement lifts it via isProEntitled at job execution.
 SUBMISSION.md's known-limitation line removed — the limitation no longer exists.
+
+## B-014 · "Go Pro" dimmed for the first beat of every pricing visit · FIXED
+When: user feedback round 5 · Where: pricing.tsx
+Symptom: the button rendered at 50% opacity for a moment on page load.
+Root cause: `disabled={sub.isLoading}` tied the button's look to the subscription state fetch — a loading concern leaking into a stable control.
+Fix: the button stays visually steady; only an actual click sets a local busy state ("Opening checkout…"). · Verified on prod.
+
+## D-036 · Google Docs browsing is the headline import path; multi-select; link collapsed
+When: user feedback round 5
+Decisions: (a) the import panel opens on the GOOGLE DOCS tab — browsing your own docs is the demo-grade path, paste is the fallback. (b) Doc rows are now checkboxes: select any number, and the one "Import to the board" button imports them — sequentially on purpose, each doc = one import = one quota unit = one job (the journey notes "N DOCS QUEUED"); combining docs into one mega-import would have made 25 docs cost one quota unit. (c) The paste-a-link field collapses behind "+ PASTE A LINK INSTEAD".
+Beats: import-on-row-click (took the primary button out of the loop — the user's observation) and parallel enqueues (racing writes for no UX gain).
+
+## D-037 · Board export button is a download glyph
+When: user feedback round 5. The HUD's EXPORT .MD text became the tray-download icon (same glyph as IMPORT's, inverted meaning read from context) with tooltip + aria-label.
+
+## D-038 · Yearly billing exposed: MONTHLY/YEARLY toggle on the Pro card
+When: user feedback round 5 ("no way to choose annual plan")
+Decision: subscriptions.ts already declared yearlyCents (both Stripe Prices existed since Connect sync) — the page just never offered the choice. A MONTHLY/YEARLY toggle switches the displayed price ($9/mo ↔ $90/yr, "two months free") and passes { interval } to subscribe(). Verified on prod: yearly checkout reaches checkout.stripe.com showing $90.00/year.

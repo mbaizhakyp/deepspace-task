@@ -544,8 +544,16 @@ export default function Board({
 
         {/* camera HUD — screen-fixed, like the wire log */}
         <div className="wire absolute bottom-4 right-5 z-30 flex items-center gap-2 text-chrome">
-          <button onClick={exportBoard} className="mr-1 rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" title="Download the board as Markdown">
-            EXPORT .MD
+          <button
+            onClick={exportBoard}
+            className="mr-1 rounded-sm border border-border px-2 py-[5px] hover:border-chrome hover:text-foreground"
+            title="Download the board as Markdown"
+            aria-label="Download the board as Markdown"
+          >
+            <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
+              <path d="M7 1.5V8M4.5 5.5L7 8l2.5-2.5" />
+              <path d="M1.5 9.5v2a1 1 0 001 1h9a1 1 0 001-1v-2" />
+            </svg>
           </button>
           <button onClick={() => zoomBy(1 / 1.25)} className="rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" aria-label="Zoom out">−</button>
           <span className="w-10 text-center tabular-nums">{Math.round(view.scale * 100)}%</span>

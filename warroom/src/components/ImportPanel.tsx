@@ -17,9 +17,13 @@ type ImportResult = { created?: number }
 export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () => void }) {
   const { user } = useAuthUser()
   const { jobs, connected } = useJobs<ImportPayload, ImportResult>(`board:${roomId}`)
-  const [source, setSource] = useState<'paste' | 'gdoc'>('paste')
+  // Google Docs browsing is the headline import path (user decision, round 5)
+  const [source, setSource] = useState<'paste' | 'gdoc'>('gdoc')
   const [text, setText] = useState('')
   const [docUrl, setDocUrl] = useState('')
+  const [linkOpen, setLinkOpen] = useState(false)
+  const [selected, setSelected] = useState<Set<string>>(new Set())
+  const [queuedCount, setQueuedCount] = useState(1)
   const [mode, setMode] = useState<'cards' | 'key-points'>('cards')
   const [submitting, setSubmitting] = useState(false)
   const [submitError, setSubmitError] = useState<string | null>(null)
@@ -111,8 +115,10 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
     else setSubmitError(res.error ?? 'could not list your docs')
   }
 
-  async function importDoc(params: { docId?: string; url?: string }) {
-    if (running || submitting) return
+  /** Import one or more Google Docs (multi-select rows, or the pasted link). */
+  async function importDocs(params: Array<{ docId?: string; url?: string }>) {
+    if (running || submitting || params.length === 0) return
+    setQueuedCount(params.length)
     setSubmitting(true)
     setSubmitError(null)
     setNeedsUpgrade(false)
@@ -123,32 +129,45 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
     setViaGdoc(true)
     setEnqueued(false)
     setFlow('progress')
-    const res = await callAction<{ needsConnection?: boolean; redirectUrl?: string }>('import-gdoc', {
-      roomId,
-      ...params,
-      mode,
-      userName: user?.fullName ?? '',
-    })
-    setSubmitting(false)
-    if (handleConnection(res)) {
-      setFlow('form')
-      return
-    }
-    if (res.success) {
-      setDocUrl('')
-      setDocs(null)
+    // sequential on purpose: each doc is one import (one quota unit, one job);
+    // the jobs queue in the board's job room and cards land batch after batch
+    for (const p of params) {
+      const res = await callAction<{ needsConnection?: boolean; redirectUrl?: string }>('import-gdoc', {
+        roomId,
+        ...p,
+        mode,
+        userName: user?.fullName ?? '',
+      })
+      if (handleConnection(res)) {
+        setSubmitting(false)
+        setFlow('form')
+        return
+      }
+      if (!res.success) {
+        setSubmitting(false)
+        setFlow('form')
+        if (res.error === 'upgrade_required') setNeedsUpgrade(true)
+        else setSubmitError(res.error ?? 'import failed')
+        return
+      }
       setEnqueued(true)
-    } else {
-      setFlow('form')
-      if (res.error === 'upgrade_required') setNeedsUpgrade(true)
-      else setSubmitError(res.error ?? 'import failed')
     }
+    setSubmitting(false)
+    setDocUrl('')
+    setSelected(new Set())
+    setDocs(null)
   }
 
   async function start() {
-    const input = source === 'paste' ? text.trim() : docUrl.trim()
-    if (!input || running || submitting) return
-    if (source === 'gdoc') return importDoc({ url: docUrl })
+    if (running || submitting) return
+    if (source === 'gdoc') {
+      // selected rows win; the pasted link is the fallback path
+      if (selected.size > 0) return importDocs([...selected].map((docId) => ({ docId })))
+      if (docUrl.trim()) return importDocs([{ url: docUrl }])
+      return
+    }
+    if (!text.trim()) return
+    setQueuedCount(1)
     setStaleJobId(newest?.id ?? null) // B-012: never render the old job's steps
     setSubmitting(true)
     setSubmitError(null)
@@ -189,6 +208,11 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
           <div className="font-serif text-2xl text-foreground">
             {succeeded ? 'Import landed' : 'Import in progress'}
           </div>
+          {queuedCount > 1 && (
+            <div className="wire mt-1.5 text-[10px] text-chrome">
+              {queuedCount} DOCS QUEUED · CARDS LAND AS EACH FINISHES
+            </div>
+          )}
           <div className="mt-6 flex flex-col">
             {steps.map((s, i) => (
               <div key={s.label} className="flex gap-3">
@@ -254,13 +278,13 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
       ) : (
         <>
           <div className="mt-4 flex gap-1 rounded-sm border border-border p-1">
-            {(['paste', 'gdoc'] as const).map((s) => (
+            {(['gdoc', 'paste'] as const).map((s) => (
               <button
                 key={s}
                 onClick={() => setSource(s)}
                 className={`wire flex-1 rounded-[2px] px-2 py-1.5 ${source === s ? 'bg-accent text-foreground' : 'text-chrome hover:text-foreground'}`}
               >
-                {s === 'paste' ? 'PASTE TEXT' : 'GOOGLE DOC'}
+                {s === 'paste' ? 'PASTE TEXT' : 'GOOGLE DOCS'}
               </button>
             ))}
           </div>
@@ -283,32 +307,68 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
                 </button>
               ) : (
                 <div className="mt-3 flex max-h-64 flex-col gap-1 overflow-y-auto">
-                  {docs.map((d) => (
-                    <button
-                      key={d.id}
-                      onClick={() => importDoc({ docId: d.id })}
-                      disabled={submitting}
-                      className="flex items-baseline justify-between gap-2 rounded-sm border border-border px-3 py-2.5 text-left hover:border-chrome disabled:opacity-50"
-                    >
-                      <span className="truncate text-[13px] text-foreground">{d.title}</span>
-                      {d.modified && (
-                        <span className="wire flex-none text-[10px] text-chrome/70">
-                          {new Date(d.modified).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                  {docs.map((d) => {
+                    const on = selected.has(d.id)
+                    return (
+                      <button
+                        key={d.id}
+                        onClick={() =>
+                          setSelected((cur) => {
+                            const next = new Set(cur)
+                            if (next.has(d.id)) next.delete(d.id)
+                            else next.add(d.id)
+                            return next
+                          })
+                        }
+                        disabled={submitting}
+                        className={`flex items-center justify-between gap-2 rounded-sm border px-3 py-2.5 text-left disabled:opacity-50 ${on ? 'border-primary' : 'border-border hover:border-chrome'}`}
+                      >
+                        <span className="flex min-w-0 items-center gap-2.5">
+                          <span
+                            className={`flex h-3.5 w-3.5 flex-none items-center justify-center rounded-[2px] border ${on ? 'border-primary bg-primary' : 'border-chrome/50'}`}
+                          >
+                            {on && (
+                              <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                                <path d="M1 4.2 L3 6.2 L7 1.8" stroke="#101210" strokeWidth="1.5" />
+                              </svg>
+                            )}
+                          </span>
+                          <span className="truncate text-[13px] text-foreground">{d.title}</span>
                         </span>
-                      )}
+                        {d.modified && (
+                          <span className="wire flex-none text-[10px] text-chrome/70">
+                            {new Date(d.modified).toLocaleDateString(undefined, { month: 'short', day: 'numeric' })}
+                          </span>
+                        )}
+                      </button>
+                    )
+                  })}
+                  <div className="wire mt-1 flex items-center gap-4">
+                    <button onClick={browseDocs} className="text-chrome hover:text-foreground">
+                      REFRESH
                     </button>
-                  ))}
-                  <button onClick={browseDocs} className="wire mt-1 self-start text-chrome hover:text-foreground">
-                    REFRESH
-                  </button>
+                    {selected.size > 0 && (
+                      <span className="text-primary">{selected.size} SELECTED</span>
+                    )}
+                  </div>
                 </div>
               )}
-              <input
-                value={docUrl}
-                onChange={(e) => setDocUrl(e.target.value)}
-                placeholder="…or paste a doc link: docs.google.com/document/d/…"
-                className="mt-3 rounded-sm border border-border bg-background p-3 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-chrome"
-              />
+              {linkOpen ? (
+                <input
+                  autoFocus
+                  value={docUrl}
+                  onChange={(e) => setDocUrl(e.target.value)}
+                  placeholder="docs.google.com/document/d/…"
+                  className="mt-3 rounded-sm border border-border bg-background p-3 text-[13px] text-foreground outline-none placeholder:text-muted-foreground/60 focus:border-chrome"
+                />
+              ) : (
+                <button
+                  onClick={() => setLinkOpen(true)}
+                  className="wire mt-3 self-start text-chrome/70 hover:text-foreground"
+                >
+                  + PASTE A LINK INSTEAD
+                </button>
+              )}
               <p className="mt-2 text-xs leading-relaxed text-muted-foreground">
                 Fetched from your own Google account — you approve access once, we never see your
                 password.
@@ -339,10 +399,18 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
           </div>
           <button
             onClick={start}
-            disabled={(source === 'paste' ? !text.trim() : !docUrl.trim()) || !connected || submitting}
+            disabled={
+              (source === 'paste' ? !text.trim() : selected.size === 0 && !docUrl.trim()) ||
+              !connected ||
+              submitting
+            }
             className="mt-5 rounded-sm bg-primary px-4 py-2.5 text-[13px] font-semibold text-primary-foreground disabled:opacity-40"
           >
-            {submitting ? 'Starting…' : 'Import to the board'}
+            {submitting
+              ? 'Starting…'
+              : source === 'gdoc' && selected.size > 1
+                ? `Import ${selected.size} docs to the board`
+                : 'Import to the board'}
           </button>
           {needsUpgrade && (
             <div className="mt-3 rounded-sm border border-primary/50 p-3">
