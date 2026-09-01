@@ -6,10 +6,10 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import { getUserColor, useAuthUser, useMutations, usePresenceRoom, useQuery } from 'deepspace'
+import { getUserColor, useAuthUser, useJobs, useMutations, usePresenceRoom, useQuery } from 'deepspace'
 import { Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
-import { clampView, toWorld, zoomView, type View } from '../lib/camera'
+import { clampView, fitView, toWorld, zoomView, type View } from '../lib/camera'
 import { PollCard, type PollData } from './PollCard'
 import { ImportPanel } from './ImportPanel'
 import { SummaryPanel } from './SummaryPanel'
@@ -104,6 +104,34 @@ export default function Board({
       clampView(zoomView(v, rect.width / 2, rect.height / 2, factor), rect.width, rect.height, FIELD_W, FIELD_H),
     )
   }
+
+  // When an import lands, glide everyone's camera to the new cards — unless
+  // that person is mid-drag/pan (never move a view under a busy hand).
+  // Trigger on the observed running→succeeded transition only, so entering a
+  // room with an old finished import doesn't jump the camera.
+  const [glide, setGlide] = useState(false)
+  const { jobs } = useJobs(`board:${roomId}`)
+  const importJob = jobs.find((j) => j.type === 'import-text')
+  const prevImportStatus = useRef<string | null>(null)
+  useEffect(() => {
+    const prev = prevImportStatus.current
+    prevImportStatus.current = importJob?.status ?? null
+    if (importJob?.status !== 'succeeded' || prev === null || prev === 'succeeded') return
+    if (drag || pan.current) return
+    const imported = cards.filter((c) => c.data.origin === 'imported')
+    const rect = fieldRef.current?.getBoundingClientRect()
+    if (imported.length === 0 || !rect) return
+    const xs = imported.map((c) => c.data.x)
+    const ys = imported.map((c) => c.data.y)
+    const target = fitView(
+      Math.min(...xs), Math.min(...ys),
+      Math.max(...xs) + 280, Math.max(...ys) + 190, // card width/height allowance
+      rect.width, rect.height,
+    )
+    setGlide(true)
+    setView(clampView(target, rect.width, rect.height, FIELD_W, FIELD_H))
+    setTimeout(() => setGlide(false), 750)
+  }, [importJob?.status])
 
   function fieldWorldPoint(e: React.PointerEvent): { wx: number; wy: number } | null {
     const rect = fieldRef.current?.getBoundingClientRect()
@@ -358,6 +386,8 @@ export default function Board({
             height: FIELD_H,
             transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
             transformOrigin: '0 0',
+            // only the import-landed glide animates; hand pans/zooms stay 1:1
+            transition: glide ? 'transform 700ms cubic-bezier(0.25, 1, 0.35, 1)' : undefined,
           }}
         >
         {cards.map((c) => (

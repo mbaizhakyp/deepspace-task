@@ -213,3 +213,15 @@ When: D-022 verification (prod screenshot showed card meta text highlighted afte
 Symptom: dragging the board ground to pan left orange selection highlights on card text the pointer crossed.
 Root cause: pointer-event panning doesn't suppress the browser's native drag-to-select.
 Fix: `select-none` on the board field. · Verified: re-ran the prod pan script; screenshot clean.
+
+## D-023 · Import journey: checkpoint stepper + camera centers on landed cards
+When: post-submission polish (user: checkmarks per step, journey line, board centers on pulled cards)
+Decision: the import panel shows a vertical journey — PULLING THE DOC FROM GOOGLE (gdoc only) → READING & SEGMENTING → MAKING CARDS (bar + CARD n/m) → LANDED ON THE BOARD — markers ticking green with a wire line that fills as each step completes. Every checkpoint binds to a REAL signal (action in flight, job status, the 0.15 progress boundary between the job's READING phase and per-card ticks, terminal status); nothing is timed or guessed (D-018 honesty rule). On the observed running→succeeded transition, everyone's camera glides (700ms) to fit the imported cards — skipped for anyone mid-drag/pan, never on room entry with an old finished import. fitView is pure camera math with unit tests.
+Why: the stages already existed in the job's progress stream; the UI just surfaces them. Centering closes the loop the camera opened: cards can land outside your frame.
+Beats: a "connecting" checklist step (OAuth is a once-ever exceptional branch, stays as the consent prompt) and fake timed steps.
+
+## B-010 · Playwright suite blocked by vite-checker overlay on an eslint WARNING · FIXED
+When: D-023 verification · Where: dev server, `vite-plugin-checker-error-overlay`
+Symptom: 3 specs failed with "overlay intercepts pointer events"; ESLint reported 0 errors, 1 warning (an unused eslint-disable directive in Board.tsx).
+Root cause: the checker overlay covers the app for warnings too, eating every click in headless runs.
+Fix: removed the unused directive (the deps lint didn't actually fire on `importJob?.status`). · Verified: lint clean, 11 Playwright green.

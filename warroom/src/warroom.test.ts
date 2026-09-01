@@ -101,6 +101,18 @@ describe('board camera (pan/zoom math, D-022)', () => {
     expect(zoomView({ x: 0, y: 0, scale: 1 }, 0, 0, 0.01).scale).toBe(MIN_SCALE)
     expect(zoomView({ x: 0, y: 0, scale: 1 }, 0, 0, 100).scale).toBe(MAX_SCALE)
   })
+  it('fitView centers a card cluster and never zooms past 1:1', async () => {
+    const { fitView } = await import('./lib/camera')
+    // small cluster: fits at scale 1, centered
+    const v = fitView(100, 100, 500, 300, 1200, 800)
+    expect(v.scale).toBe(1)
+    expect(v.x + 300 * v.scale).toBeCloseTo(600) // cluster center x → viewport center
+    expect(v.y + 200 * v.scale).toBeCloseTo(400)
+    // huge cluster: scales down to fit, respecting MIN_SCALE
+    const wide = fitView(0, 0, 10000, 400, 1200, 800)
+    expect(wide.scale).toBeGreaterThanOrEqual(0.35)
+    expect(wide.scale).toBeLessThan(1)
+  })
   it('clampView never lets the board leave the viewport entirely', async () => {
     const { clampView } = await import('./lib/camera')
     const lost = clampView({ x: -99999, y: 99999, scale: 1 }, 1200, 800, 2400, 1400)

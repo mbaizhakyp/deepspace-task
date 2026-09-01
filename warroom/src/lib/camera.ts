@@ -25,6 +25,21 @@ export function zoomView(v: View, px: number, py: number, factor: number): View 
   return { x: px - (px - v.x) * k, y: py - (py - v.y) * k, scale }
 }
 
+/** View that fits the world rect [x0,y0]-[x1,y1] centered in the viewport. */
+export function fitView(x0: number, y0: number, x1: number, y1: number, viewportW: number, viewportH: number, pad = 80): View {
+  const w = Math.max(x1 - x0, 1)
+  const h = Math.max(y1 - y0, 1)
+  const scale = Math.min(
+    Math.max(Math.min((viewportW - pad * 2) / w, (viewportH - pad * 2) / h, 1), MIN_SCALE),
+    MAX_SCALE,
+  )
+  return {
+    scale,
+    x: viewportW / 2 - (x0 + w / 2) * scale,
+    y: viewportH / 2 - (y0 + h / 2) * scale,
+  }
+}
+
 /** Viewport (screen) point → world point. */
 export function toWorld(v: View, px: number, py: number): { wx: number; wy: number } {
   return { wx: (px - v.x) / v.scale, wy: (py - v.y) / v.scale }

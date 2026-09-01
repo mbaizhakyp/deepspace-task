@@ -5,7 +5,7 @@
  * cards materialize on the board live as the job creates them.
  */
 
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { Link } from 'react-router-dom'
 import { useAuthUser, useJobs } from 'deepspace'
 import { callAction } from '../lib/actions-client'
@@ -30,6 +30,52 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
 
   const current = jobs.find((j) => j.type === 'import-text')
   const running = current?.status === 'queued' || current?.status === 'running'
+
+  // ── the journey (D-023): checkpoints bound to REAL signals only ──────
+  // flow 'progress' shows the stepper; it opens the moment work starts
+  // (including the pre-enqueue Google fetch) and stays through the landed
+  // state until dismissed. Other room members get it via `running`.
+  const [flow, setFlow] = useState<'form' | 'progress'>('form')
+  const [enqueued, setEnqueued] = useState(false)
+  const [viaGdoc, setViaGdoc] = useState(false)
+  useEffect(() => {
+    if (running) {
+      setFlow('progress')
+      setEnqueued(true)
+    } else if (current?.status === 'failed') {
+      setFlow('form') // the form's error line takes over
+    }
+  }, [running, current?.status])
+
+  const succeeded = current?.status === 'succeeded'
+  const jobProgress = current?.progress ?? 0
+  // the job reports 0.05 CHECKING ACCESS / 0.15 READING THE DOCUMENT, then
+  // per-card ticks above 0.15 — that boundary splits segmenting from cards
+  const makingCards = jobProgress > 0.15
+  type StepState = 'done' | 'active' | 'pending'
+  const steps: { label: string; state: StepState; detail?: string; bar?: number }[] = [
+    ...(viaGdoc
+      ? [{
+          label: 'PULLING THE DOC FROM GOOGLE',
+          state: (enqueued || current ? 'done' : submitting ? 'active' : 'pending') as StepState,
+        }]
+      : []),
+    {
+      label: 'READING & SEGMENTING',
+      state: succeeded || makingCards ? 'done' : enqueued || current ? 'active' : 'pending',
+    },
+    {
+      label: 'MAKING CARDS',
+      state: succeeded ? 'done' : makingCards ? 'active' : 'pending',
+      detail: !succeeded && makingCards ? current?.progressMessage : undefined,
+      bar: succeeded ? 1 : makingCards ? (jobProgress - 0.15) / 0.85 : undefined,
+    },
+    {
+      label: 'LANDED ON THE BOARD',
+      state: succeeded ? 'done' : 'pending',
+      detail: succeeded ? `${current?.result?.created ?? 0} CARDS · BOARD CENTERED ON THEM` : undefined,
+    },
+  ]
 
   /** Shared handling of a connection-needed response: open consent, ask to retry. */
   function handleConnection(res: { success: boolean; data?: unknown }): boolean {
@@ -65,6 +111,11 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
     setSubmitError(null)
     setNeedsUpgrade(false)
     setConnecting(false)
+    // the Google fetch happens inside the action, before the job exists —
+    // show the journey now so the PULLING step is live, not retroactive
+    setViaGdoc(true)
+    setEnqueued(false)
+    setFlow('progress')
     const res = await callAction<{ needsConnection?: boolean; redirectUrl?: string }>('import-gdoc', {
       roomId,
       ...params,
@@ -72,12 +123,19 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
       userName: user?.fullName ?? '',
     })
     setSubmitting(false)
-    if (handleConnection(res)) return
+    if (handleConnection(res)) {
+      setFlow('form')
+      return
+    }
     if (res.success) {
       setDocUrl('')
       setDocs(null)
-    } else if (res.error === 'upgrade_required') setNeedsUpgrade(true)
-    else setSubmitError(res.error ?? 'import failed')
+      setEnqueued(true)
+    } else {
+      setFlow('form')
+      if (res.error === 'upgrade_required') setNeedsUpgrade(true)
+      else setSubmitError(res.error ?? 'import failed')
+    }
   }
 
   async function start() {
@@ -97,36 +155,90 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
       userName: user?.fullName ?? '',
     })
     setSubmitting(false)
-    if (res.success) setText('')
-    else if (res.error === 'upgrade_required') setNeedsUpgrade(true)
+    if (res.success) {
+      setText('')
+      setViaGdoc(false)
+      setEnqueued(true)
+      setFlow('progress')
+    } else if (res.error === 'upgrade_required') setNeedsUpgrade(true)
     else setSubmitError(res.error ?? 'import failed')
   }
 
   return (
     <div className="flex w-96 flex-none flex-col border-l border-border bg-card p-6">
       <div className="flex items-baseline justify-between">
-        <div className="wire text-chrome">IMPORT · PASTE TEXT</div>
+        <div className="wire text-chrome">IMPORT A DOCUMENT</div>
         <button onClick={onClose} className="wire text-chrome hover:text-foreground">
           CLOSE
         </button>
       </div>
 
-      {running && current ? (
-        <div className="mt-6">
-          <div className="font-serif text-2xl text-foreground">Import in progress</div>
-          <div className="mt-6 h-0.5 rounded-full bg-border">
-            <div
-              className="h-0.5 rounded-full bg-primary transition-all duration-300"
-              style={{ width: `${Math.round((current.progress ?? 0) * 100)}%` }}
-            />
+      {flow === 'progress' ? (
+        <div className="mt-6" data-testid="import-journey">
+          <div className="font-serif text-2xl text-foreground">
+            {succeeded ? 'Import landed' : 'Import in progress'}
           </div>
-          <div className="wire wire-tick mt-3 text-foreground" key={current.progressMessage}>
-            {current.progressMessage ?? 'WORKING'}
+          <div className="mt-6 flex flex-col">
+            {steps.map((s, i) => (
+              <div key={s.label} className="flex gap-3">
+                <div className="flex flex-col items-center">
+                  <StepMarker state={s.state} />
+                  {i < steps.length - 1 && (
+                    <div className="relative my-1 w-px flex-1 bg-border" style={{ minHeight: 20 }}>
+                      {/* the journey line fills as its step completes */}
+                      <div
+                        className="absolute inset-x-0 top-0 bg-live transition-all duration-700"
+                        style={{ height: s.state === 'done' ? '100%' : '0%' }}
+                      />
+                    </div>
+                  )}
+                </div>
+                <div className="flex-1 pb-4 pt-px">
+                  <div
+                    className={`wire ${
+                      s.state === 'done'
+                        ? 'text-live'
+                        : s.state === 'active'
+                          ? 'text-foreground'
+                          : 'text-chrome/50'
+                    }`}
+                  >
+                    {s.label}
+                  </div>
+                  {s.bar !== undefined && s.state === 'active' && (
+                    <div className="mt-2 h-0.5 rounded-full bg-border">
+                      <div
+                        className="h-0.5 rounded-full bg-primary transition-all duration-300"
+                        style={{ width: `${Math.round(s.bar * 100)}%` }}
+                      />
+                    </div>
+                  )}
+                  {s.detail && (
+                    <div className="wire wire-tick mt-1.5 text-[10px] text-chrome" key={s.detail}>
+                      {s.detail}
+                    </div>
+                  )}
+                </div>
+              </div>
+            ))}
           </div>
-          <p className="mt-6 text-[13px] leading-relaxed text-muted-foreground">
-            Cards are landing on the board as they're made — everyone in the room is watching the
-            same import.
-          </p>
+          {succeeded ? (
+            <button
+              onClick={() => {
+                setFlow('form')
+                setEnqueued(false)
+                setViaGdoc(false)
+              }}
+              className="wire mt-4 rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground"
+            >
+              IMPORT ANOTHER
+            </button>
+          ) : (
+            <p className="mt-4 text-[13px] leading-relaxed text-muted-foreground">
+              Cards are landing on the board as they're made — everyone in the room is watching
+              the same import.
+            </p>
+          )}
         </div>
       ) : (
         <>
@@ -246,6 +358,26 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
       )}
     </div>
   )
+}
+
+function StepMarker({ state }: { state: 'done' | 'active' | 'pending' }) {
+  if (state === 'done') {
+    return (
+      <span className="flex h-4 w-4 flex-none items-center justify-center rounded-full border border-live text-live">
+        <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+          <path d="M1 4.2 L3 6.2 L7 1.8" stroke="currentColor" strokeWidth="1.4" />
+        </svg>
+      </span>
+    )
+  }
+  if (state === 'active') {
+    return (
+      <span className="flex h-4 w-4 flex-none items-center justify-center rounded-full border border-primary">
+        <span className="breathe h-1.5 w-1.5 rounded-full bg-primary" />
+      </span>
+    )
+  }
+  return <span className="h-4 w-4 flex-none rounded-full border border-border" />
 }
 
 function ModeRadio({
