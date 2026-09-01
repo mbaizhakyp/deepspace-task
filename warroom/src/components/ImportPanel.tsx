@@ -103,6 +103,16 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
   // chronological per-doc counts → "5 + 3 + 4 = 12 CARDS" for multi-doc runs
   const parts = createdParts(runJobs)
   const runCreated = parts.reduce((n, c) => n + c, 0)
+  // stuck = the JOB's age, not this panel's clock — a reopened panel must see
+  // a long-dead job as stuck immediately-ish, not restart a 3-minute wait
+  const stuckRef = live ?? current
+  const stuckAge = stuckRef
+    ? Date.now() - new Date(stuckRef.startedAt ?? stuckRef.enqueuedAt).getTime()
+    : 0
+  const looksStuck =
+    !succeeded &&
+    (stuckRef?.status === 'running' || stuckRef?.status === 'queued') &&
+    stuckAge > 240_000
   type StepState = 'done' | 'active' | 'pending'
   const steps: { label: string; state: StepState; detail?: string; bar?: number }[] = [
     ...(viaGdoc
@@ -315,6 +325,29 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
               </div>
             ))}
           </div>
+          {/* B-019 second line of defense: whatever kills a job server-side,
+              the panel must never show endless work. Past a generous bound,
+              call it stuck and hand the user the exit. */}
+          {looksStuck && (
+            <div className="mt-4 rounded-sm border border-warnamber/50 p-3">
+              <div className="wire text-warnamber">THIS IMPORT LOOKS STUCK</div>
+              <p className="mt-1 text-xs text-muted-foreground">
+                The job hasn't reported progress in a long while — it may have died. Dismiss and
+                try again; any cards it already made are on the board.
+              </p>
+              <button
+                onClick={() => {
+                  if (newest) setStaleJobId(newest.id)
+                  setFlow('form')
+                  setEnqueued(false)
+                  setViaGdoc(false)
+                }}
+                className="btn-solid wire mt-2 rounded-sm px-3 py-2 font-medium"
+              >
+                DISMISS
+              </button>
+            </div>
+          )}
           {succeeded ? (
             <button
               onClick={() => {

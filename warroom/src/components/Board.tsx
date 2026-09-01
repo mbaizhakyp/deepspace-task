@@ -550,6 +550,7 @@ export default function Board({
             key={p.recordId}
             pollId={p.recordId}
             data={p.data}
+            memberCount={Math.max(memberCount, peers.length + 1)}
             isFacilitator={isFacilitator}
             locked={locked}
             // mirrors the server rule (pollDeleteDenial: creator or facilitator)

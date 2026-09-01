@@ -401,3 +401,13 @@ When: user report, round 13 ("4 CARDS" after importing several documents)
 Symptom: after a multi-select Google Docs import, LANDED ON THE BOARD reported the final document's card count alone.
 Root cause: a multi-doc run is N sequential jobs, and every stepper read (`current`) pointed at the NEWEST job — correct for run-done detection (newest runs last), wrong for totals and mid-run progress.
 Fix: the run = every import-text job newer than the stale marker (pure `collectRun`/`createdParts` in src/lib/import-run.ts, unit-tested with the exact newest-first + stale-cutoff scenario). LANDED now shows the user's suggested shape — "5 + 3 + 4 = 12 CARDS"; the MAKING CARDS bar/message follows the job that is actually RUNNING; the header line counts "DOC k/N" live.
+
+## B-019 · Import stuck at "READING & SEGMENTING" forever · FIXED (two layers)
+When: user report, round 14 (screenshot: WORKING clock climbing indefinitely on a reopened panel)
+Root cause: the AI segmentation call had NO timeout — a hung integration call left the job status 'running' forever (maxAttempts 1, nothing to fail it), and the panel faithfully rendered the zombie as endless work.
+Fix (server): the segmentation call now races a 120s deadline; a hang becomes a clean job FAILURE the panel reports honestly.
+Fix (client): independent stuck detection — a job queued/running whose OWN age (startedAt/enqueuedAt, not the panel's local clock, which resets on reopen) exceeds 4 minutes gets an amber "THIS IMPORT LOOKS STUCK" notice with a DISMISS escape hatch. Whatever kills a job in future, the panel can never be pinned again.
+
+## D-048 · Polls announce when everyone has voted
+When: user feedback round 14
+Decision: when every room member has voted on an open poll, the card signals ripeness: a forest-green ring around the card, the header flips to "EVERYONE VOTED · N/N — READY TO DECIDE", and vote counts everywhere show n/m against the member count (green when complete). Forest green (#15803d) on paper — phosphor fails on cream. Verified with two live users: banner absent at 1/2, appears in BOTH windows at 2/2.

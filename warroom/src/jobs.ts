@@ -150,6 +150,16 @@ async function importText(job: Job, ctx: JobContext, env: Env): Promise<unknown>
   return { created, bbox: created > 0 ? [bbox.x0, bbox.y0, bbox.x1, bbox.y1] : undefined }
 }
 
+/** A promise with a deadline — hung upstream calls become clean failures. */
+function withTimeout<T>(p: Promise<T>, ms: number, what: string): Promise<T> {
+  return Promise.race([
+    p,
+    new Promise<never>((_, reject) =>
+      setTimeout(() => reject(new Error(`${what} timed out after ${ms / 1000}s — try again`)), ms),
+    ),
+  ])
+}
+
 /**
  * AI segmentation (D-004): split by IDEA, not by headings — headings are a
  * hint. 'cards' mode maps the whole document; 'key-points' distills only
@@ -165,7 +175,11 @@ async function segment(
       ? 'Extract only the points worth discussing in a meeting: decisions to make, open questions, risks, action items. 4-12 cards.'
       : 'Break the ENTIRE document into cards, one coherent idea per card. Use headings as hints when present, but segment by meaning — unstructured text gets segmented by topic shifts. 4-24 cards.'
 
-  const res = await ownerIntegration<{ content?: Array<{ type: string; text?: string }> }>(
+  // B-019: an AI call that hangs left the job 'running' forever — the panel
+  // showed "Import in progress" for eternity. A hung call now FAILS the job
+  // (maxAttempts 1 → status 'failed'), which the panel reports honestly.
+  const res = await withTimeout(
+    ownerIntegration<{ content?: Array<{ type: string; text?: string }> }>(
     env,
     'anthropic/chat-completion',
     {
@@ -176,6 +190,9 @@ async function segment(
         'Respond with ONLY a JSON array: [{"title": "...", "body": "..."}]. No prose, no code fences.',
       messages: [{ role: 'user', content: text.slice(0, 60_000) }],
     },
+    ),
+    120_000,
+    'AI segmentation',
   )
   if (!res.success) throw new Error(res.error ?? res.message ?? 'AI call failed')
 

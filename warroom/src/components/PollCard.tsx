@@ -37,6 +37,7 @@ export function PollCard({
   data,
   isFacilitator,
   locked,
+  memberCount,
   canDelete,
   onDelete,
   onPointerDown,
@@ -46,6 +47,7 @@ export function PollCard({
   data: PollData
   isFacilitator: boolean
   locked: boolean
+  memberCount: number
   canDelete: boolean
   onDelete: () => void
   onPointerDown: (e: React.PointerEvent) => void
@@ -65,6 +67,8 @@ export function PollCard({
   const total = votes.length
   const max = Math.max(1, ...counts)
   const winner = closed ? counts.indexOf(Math.max(...counts)) : -1
+  // everyone in = the poll is ripe (round 14): the card says so in green
+  const allVoted = !closed && memberCount > 0 && total >= memberCount
 
   async function vote(optionIndex: number) {
     if (closed || locked || !voteMutations.ready) return
@@ -95,16 +99,22 @@ export function PollCard({
 
   return (
     <div
-      className={`card-drop absolute z-10 w-80 rounded-sm bg-paper p-4 shadow-[0_2px_6px_rgba(26,26,22,.35)] ${dragPos ? 'z-30' : ''}`}
+      className={`card-drop absolute z-10 w-80 rounded-sm bg-paper p-4 shadow-[0_2px_6px_rgba(26,26,22,.35)] ${allVoted ? 'ring-2 ring-[#15803d]/50' : ''} ${dragPos ? 'z-30' : ''}`}
       style={{ left: x, top: y }}
     >
       <div
         className={`wire text-[10px] text-ink-muted ${locked ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}`}
         onPointerDown={onPointerDown}
       >
-        {closed
-          ? `DECIDED${data.closedAt ? ' ' + formatTime(data.closedAt) : ''} · ${total} VOTED`
-          : `LIVE POLL${data.authorName ? ' · ' + data.authorName.toUpperCase() : ''}`}
+        {closed ? (
+          `DECIDED${data.closedAt ? ' ' + formatTime(data.closedAt) : ''} · ${total} VOTED`
+        ) : allVoted ? (
+          <span className="font-medium text-[#15803d]">
+            EVERYONE VOTED · {total}/{memberCount} — READY TO DECIDE
+          </span>
+        ) : (
+          `LIVE POLL${data.authorName ? ' · ' + data.authorName.toUpperCase() : ''}`
+        )}
       </div>
       <div className="mt-1.5 font-serif text-xl leading-snug text-ink">{data.question}</div>
 
@@ -141,11 +151,15 @@ export function PollCard({
 
       <div className="wire mt-3.5 flex items-center justify-between text-[10px] text-ink-muted">
         <span>
-          {closed
-            ? `RESULT · ${(options[winner] ?? '').toUpperCase()} · ${counts.join('–')}`
-            : myVote
-              ? `YOU VOTED · ${total} VOTED`
-              : `${total} VOTED`}
+          {closed ? (
+            `RESULT · ${(options[winner] ?? '').toUpperCase()} · ${counts.join('–')}`
+          ) : allVoted ? (
+            <span className="text-[#15803d]">{total}/{memberCount} IN</span>
+          ) : myVote ? (
+            `YOU VOTED · ${total}/${memberCount} VOTED`
+          ) : (
+            `${total}/${memberCount} VOTED`
+          )}
         </span>
         <span className="flex items-center gap-1.5">
           {canDelete && (

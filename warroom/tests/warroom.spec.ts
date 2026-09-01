@@ -45,11 +45,11 @@ test('war room: live sync, one-vote polls, server-enforced freeze', async ({ use
 
   // B votes Yes, then changes to No — still exactly 1 vote total
   await b.page.getByRole('button', { name: /^Yes/ }).click()
-  await expect(b.page.getByText(/YOU VOTED · 1 VOTED/)).toBeVisible({ timeout: 10_000 })
+  await expect(b.page.getByText(/YOU VOTED · 1\/2 VOTED/)).toBeVisible({ timeout: 10_000 })
   await b.page.getByRole('button', { name: /^No/ }).click()
-  await expect(b.page.getByText(/YOU VOTED · 1 VOTED/)).toBeVisible({ timeout: 10_000 })
+  await expect(b.page.getByText(/YOU VOTED · 1\/2 VOTED/)).toBeVisible({ timeout: 10_000 })
   // and A sees the same single vote arrive live
-  await expect(a.page.getByText(/1 VOTED/).first()).toBeVisible({ timeout: 10_000 })
+  await expect(a.page.getByText(/1\/2 VOTED/).first()).toBeVisible({ timeout: 10_000 })
 
   // ── A freezes; B sees the banner arrive over sync ───────────────────
   await a.page.getByRole('button', { name: 'FREEZE', exact: true }).click()
