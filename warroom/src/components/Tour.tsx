@@ -47,6 +47,16 @@ function markLive() {
     /* fine */
   }
 }
+/** Forget the tour entirely — the lobby's replay link (round 12). */
+export function resetTour() {
+  try {
+    localStorage.removeItem(DONE_KEY)
+    sessionStorage.removeItem(LIVE_KEY)
+  } catch {
+    /* fine */
+  }
+}
+
 export function finishTour() {
   try {
     localStorage.setItem(DONE_KEY, 'done')

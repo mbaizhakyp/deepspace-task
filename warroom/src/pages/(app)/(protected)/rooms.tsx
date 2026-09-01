@@ -12,7 +12,7 @@ import { callAction } from '../../../lib/actions-client'
 import { parseMemberIds } from '../../../actions/rooms'
 import { parseJoinInput } from '../../../lib/join-code'
 import { leftRooms } from '../../../lib/left-rooms'
-import { WalkthroughWelcome } from '../../../components/Tour'
+import { resetTour, WalkthroughWelcome } from '../../../components/Tour'
 
 
 
@@ -155,6 +155,7 @@ export default function RoomsPage() {
   // one intent at a time (user feedback): the lobby leads with two buttons;
   // the matching field appears only once you've picked an intent
   const [intent, setIntent] = useState<'none' | 'create' | 'join'>('none')
+  const [tourKey, setTourKey] = useState(0)
 
   const today = new Date()
     .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
@@ -237,7 +238,7 @@ export default function RoomsPage() {
           </div>
         )}
 
-        <WalkthroughWelcome steps={lobbyTour} />
+        <WalkthroughWelcome key={tourKey} steps={lobbyTour} />
 
         <div className="wire mt-10 border-b border-border pb-1 text-[10px] text-chrome">
           YOUR ROOMS
@@ -289,6 +290,16 @@ export default function RoomsPage() {
           )
         })}
         </div>
+
+        <button
+          onClick={() => {
+            resetTour()
+            setTourKey((k) => k + 1)
+          }}
+          className="wire mt-12 text-[10px] text-chrome/50 hover:text-chrome"
+        >
+          ↻ REPLAY THE WALKTHROUGH
+        </button>
       </div>
     </div>
   )
