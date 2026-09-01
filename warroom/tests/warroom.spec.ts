@@ -16,6 +16,11 @@ test('war room: live sync, one-vote polls, server-enforced freeze', async ({ use
   test.setTimeout(120_000)
   const [a, b] = await users(2)
 
+  // the walkthrough welcome modal (D-046) would cover the lobby for a fresh
+  // profile — mark it done before any page loads
+  await a.page.addInitScript(() => localStorage.setItem('warroom-tour2', 'done'))
+  await b.page.addInitScript(() => localStorage.setItem('warroom-tour2', 'done'))
+
   // ── A creates a room ────────────────────────────────────────────────
   await a.page.goto('/rooms')
   await a.page.getByRole('button', { name: 'NEW ROOM' }).click()
@@ -130,7 +135,7 @@ test('war room: live sync, one-vote polls, server-enforced freeze', async ({ use
 
   // ── facilitator may delete a poll they didn't create (schema delete:true
   // narrowed by pollDeleteDenial to creator-or-facilitator) ─────────────
-  await a.page.getByRole('button', { name: 'DELETE', exact: true }).click()
+  await a.page.getByRole('button', { name: 'Delete this poll' }).click()
   await expect(a.page.getByText(/RESULT ·/)).toHaveCount(0, { timeout: 10_000 })
   await expect(b.page.getByText(/RESULT ·/)).toHaveCount(0, { timeout: 10_000 })
 })

@@ -302,12 +302,16 @@
   }
 }
 
-/* Solid journey buttons (D-043): foreground-on-background auto-contrasts in
-   both editions (light chip on the night desk, ink chip on newsprint). The
-   single orange stays reserved for each screen's one true ask. */
+/* Solid journey buttons (D-043, retoned D-046): paper-and-ink — the
+   convention is brand fill for the primary ask, a TONAL surface for
+   secondary emphasis (Material tonal / shadcn secondary), never a stark
+   foreground inversion. Our tonal surface is the product's own artifact
+   material: warm paper, ink text — glows on the night desk, sits softly
+   raised on newsprint. Orange stays the one true ask. */
 .btn-solid {
-  background-color: var(--color-foreground);
-  color: var(--color-background);
+  background-color: var(--color-paper);
+  color: var(--color-ink);
+  border: 1px solid rgba(26, 26, 22, 0.18);
 }
 .btn-solid:hover {
   filter: brightness(1.12);

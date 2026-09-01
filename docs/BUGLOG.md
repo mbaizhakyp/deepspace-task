@@ -374,3 +374,16 @@ Decisions:
 - Signed-out landing gained a below-the-fold section: HOW A WARROOM RUNS (01 IMPORT / 02 DECIDE / 03 EXPORT), a one-line pricing strip, and a second "Start here — it's free" ask.
 - Dispatch empty-state copy cut to a laconic CTA ("Nothing to file yet. Import a document, argue it out — then summarize.").
 - HUD chips softened (round-8's solid tier read too loud floating over the board): raised card-colored chips with hairlines.
+
+## B-017 · Re-summarize refused after a vote changed · FIXED
+When: user report, round 10 ("I changed the vote and asked again — got TRY AGAIN IN A MINUTE")
+Symptom: a flat 60s rate limit rejected summaries even when the board had genuinely changed.
+Root cause: the AI-cost guard measured TIME, not sameness — the wrong axis. Time was a proxy for "nothing new to say" and the proxy broke exactly when a user acted quickly.
+Fix: the guard now fingerprints the board (cards+polls+votes → stable hash stored as rooms.summaryHash). Changed board → summarize immediately, no timer; unchanged board → refused with the honest reason ("nothing has changed since the last dispatch"). · Verified on prod: vote change → immediate re-summary allowed; unchanged refresh → refused with the new message.
+
+## D-046 · Round-10: one continuous interactive walkthrough; red trash; paper-tonal buttons
+When: user feedback round 10
+Decisions:
+- Walkthrough rebuilt as ONE continuous tour: a centered welcome modal (page dimmed, serif "Learn the room in 30 seconds.", big orange Start, deliberately tiny skip) → passive lobby steps → INTERACTIVE steps where the user actually clicks + NEW ROOM, names the room, and presses Open a room (the tour shows "YOUR TURN" and advances on their action, not a Next) → resumes inside the room via a sessionStorage live-flag across the navigation → six room steps → done (localStorage). Specs seed the done-flag; the modal caught collab.spec on /home (signed-in redirect), which is how we know it really blocks everything.
+- Deletes are a red trash icon (rooms in lobby + in-room, polls) with the two-step SURE? arm kept. LEAVE stays text — leaving isn't destruction.
+- btn-solid retoned from foreground-inversion (black chips in day — the user's complaint) to PAPER-AND-INK: per convention (Material tonal / shadcn secondary), secondary emphasis is a tonal surface, and ours is the product's own artifact material — warm paper chips in both editions. Orange remains the single primary ask.

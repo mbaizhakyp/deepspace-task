@@ -1,7 +1,8 @@
 /**
  * Summarize the room: cards + decided polls → a dispatch ("what was decided"),
  * stored on the app-scope room record so every member sees it sync in.
- * Rate-limited to one run per room per minute (G8 — AI is developer-billed).
+ * AI-cost guard: refused only when the board is UNCHANGED since the last
+ * dispatch (B-017) — any change, including a moved vote, summarizes at once.
  */
 
 import type { ActionHandler } from 'deepspace/worker'
@@ -14,6 +15,18 @@ type RoomData = {
   memberIds: unknown
   facilitatorId: string
   summaryAt?: number
+  summaryHash?: string
+}
+
+/** Cheap stable fingerprint of the board content a summary is based on. */
+export function boardFingerprint(parts: Array<{ recordId: string; data: unknown }>): string {
+  const s = parts
+    .map((r) => `${r.recordId}:${JSON.stringify(r.data)}`)
+    .sort()
+    .join('|')
+  let h = 5381
+  for (let i = 0; i < s.length; i++) h = ((h * 33) ^ s.charCodeAt(i)) >>> 0
+  return h.toString(16)
 }
 type CardData = { title?: string; body?: string; origin?: string }
 type PollData = { question: string; options: unknown; status?: string }
@@ -35,9 +48,6 @@ export const summarize: ActionHandler<Env> = async ({ userId, params, tools }) =
   if (!room) return { success: false, error: 'room not found' }
   const isMember = room.facilitatorId === userId || parseMemberIds(room.memberIds).includes(userId)
   if (!isMember) return { success: false, error: 'not a member of this room' }
-  if (room.summaryAt && Date.now() - room.summaryAt < 60_000) {
-    return { success: false, error: 'summary was just made — try again in a minute' }
-  }
 
   const board = t.forRoom(`board:${roomId}`)
   const [cardsRes, pollsRes, votesRes] = await Promise.all([
@@ -50,6 +60,14 @@ export const summarize: ActionHandler<Env> = async ({ userId, params, tools }) =
   const votes = votesRes.success ? (votesRes.data?.records ?? []) : []
   if (cards.length === 0 && polls.length === 0) {
     return { success: false, error: 'nothing on the board to summarize' }
+  }
+
+  // B-017: the AI-cost guard blocks SAMENESS, not time. A changed board (a
+  // moved vote counts!) summarizes immediately; an unchanged one is refused
+  // with the honest reason. The old flat 60s window rejected real changes.
+  const hash = boardFingerprint([...cards, ...polls, ...votes])
+  if (room.summaryHash && room.summaryHash === hash) {
+    return { success: false, error: 'nothing has changed since the last dispatch' }
   }
 
   const pollLines = polls.map((p) => {
@@ -82,7 +100,7 @@ export const summarize: ActionHandler<Env> = async ({ userId, params, tools }) =
   if (!summary) return { success: false, error: 'summary came back malformed — try again' }
 
   const at = Date.now()
-  await t.update('rooms', roomId, { summary, summaryAt: at })
+  await t.update('rooms', roomId, { summary, summaryAt: at, summaryHash: hash })
   // dispatch history (D-042): every summary is kept, not just the latest
   await board.create('summaries', {
     at,

@@ -151,9 +151,14 @@ export function PollCard({
           {canDelete && (
             <button
               onClick={onDelete}
-              className="wire rounded-[2px] border border-ink/15 px-2 py-1 text-ink-muted hover:border-ink/40 hover:text-ink"
+              title="Delete this poll"
+              aria-label="Delete this poll"
+              className="rounded-[2px] border border-destructive/30 p-1.5 text-destructive/80 hover:border-destructive hover:text-destructive"
             >
-              DELETE
+              <svg width="12" height="12" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden>
+                <path d="M2 3.5h10M5.5 3.5V2.3a.6.6 0 01.6-.6h1.8a.6.6 0 01.6.6v1.2" />
+                <path d="M3.5 3.5l.55 8a1 1 0 001 .9h3.9a1 1 0 001-.9l.55-8M5.8 6.2v3.8M8.2 6.2v3.8" />
+              </svg>
             </button>
           )}
           {!closed && isFacilitator && (

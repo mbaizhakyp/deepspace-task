@@ -12,16 +12,37 @@ import { callAction } from '../../../lib/actions-client'
 import { parseMemberIds } from '../../../actions/rooms'
 import { parseJoinInput } from '../../../lib/join-code'
 import { leftRooms } from '../../../lib/left-rooms'
-import { TourOffer } from '../../../components/Tour'
+import { WalkthroughWelcome } from '../../../components/Tour'
 
 const LOBBY_TOUR = [
   { anchor: 'nav', title: 'THE DESK', body: 'Rooms is your lobby, Pricing the plans, Settings your account. The wire clock is always on.' },
   { anchor: 'theme', title: 'DAY / NIGHT', body: 'Flip between the night desk and the day edition any time — your cards stay paper either way.' },
-  { anchor: 'new-room', title: 'START HERE', body: 'Open a room and name the decision — "Q3 launch plan". You become its facilitator.' },
-  { anchor: 'join', title: 'INVITED?', body: 'Paste the room link or type a WR- code here. Opening a link also joins you automatically.' },
+  { anchor: 'join', title: 'INVITED?', body: 'Teammates join by pasting a room link or typing a WR- code here.' },
+  {
+    anchor: 'new-room',
+    title: 'YOUR TURN',
+    body: 'Click + NEW ROOM to start your first war room.',
+    advanceWhen: () => !!document.querySelector('[data-tour="room-name"]'),
+  },
+  {
+    anchor: 'room-name',
+    title: 'NAME THE DECISION',
+    body: "Type a name — 'Q3 launch plan' — and press Open a room. The tour continues inside.",
+    advanceWhen: () => window.location.pathname.startsWith('/room/'),
+  },
 ]
 
 type Room = { name: string; facilitatorId: string; memberIds?: unknown }
+
+/** The universal "this deletes" sign (D-046) — red, per convention. */
+export function TrashIcon({ size = 14 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden>
+      <path d="M2 3.5h10M5.5 3.5V2.3a.6.6 0 01.6-.6h1.8a.6.6 0 01.6.6v1.2" />
+      <path d="M3.5 3.5l.55 8a1 1 0 001 .9h3.9a1 1 0 001-.9l.55-8M5.8 6.2v3.8M8.2 6.2v3.8" />
+    </svg>
+  )
+}
 
 export default function RoomsPage() {
   const { user } = useAuthUser()
@@ -157,6 +178,7 @@ export default function RoomsPage() {
           <div className="mt-3 flex gap-3">
             <Input
               autoFocus
+              data-tour="room-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
               onKeyDown={(e) => e.key === 'Enter' && create()}
@@ -197,11 +219,7 @@ export default function RoomsPage() {
           </div>
         )}
 
-        <TourOffer
-          storageKey="warroom-tour-lobby"
-          label="FIRST TIME AT THE DESK?"
-          steps={LOBBY_TOUR}
-        />
+        <WalkthroughWelcome steps={LOBBY_TOUR} />
 
         <div className="wire mt-10 border-b border-border pb-1 text-[10px] text-chrome">
           YOUR ROOMS
@@ -239,14 +257,15 @@ export default function RoomsPage() {
               </button>
               <button
                 onClick={() => (mine ? deleteRoom(r.recordId) : leaveRow(r.recordId))}
-                className={`wire group-hover:inline ${
+                title={mine ? 'Delete this room' : 'Leave this room'}
+                className={`wire group-hover:inline-flex items-center ${
                   armedDelete === r.recordId
-                    ? 'inline text-destructive'
-                    : 'hidden text-chrome hover:text-destructive'
+                    ? 'inline-flex text-destructive'
+                    : 'hidden text-destructive/70 hover:text-destructive'
                 }`}
                 aria-label={`${mine ? 'Delete' : 'Leave'} ${r.data.name}`}
               >
-                {armedDelete === r.recordId ? 'SURE?' : mine ? 'DELETE' : 'LEAVE'}
+                {armedDelete === r.recordId ? 'SURE?' : mine ? <TrashIcon /> : 'LEAVE'}
               </button>
             </div>
           )

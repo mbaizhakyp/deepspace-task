@@ -22,6 +22,8 @@ export const roomsSchema: CollectionSchema = {
     { name: 'importCount', storage: 'number', interpretation: 'plain', default: 0 },
     { name: 'summary', storage: 'text', interpretation: { kind: 'json' } },
     { name: 'summaryAt', storage: 'number', interpretation: 'plain' },
+    // fingerprint of the board state the last summary saw (B-017)
+    { name: 'summaryHash', storage: 'text', interpretation: 'plain' },
   ],
   collaboratorsField: 'memberIds',
   permissions: {

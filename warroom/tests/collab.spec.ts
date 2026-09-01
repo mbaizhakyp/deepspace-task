@@ -34,6 +34,10 @@ test.skip(
 test('each browser renders its own signed-in account', async ({ users }) => {
   const [a, b] = await users(2)
 
+  // the walkthrough welcome modal (D-046) covers fresh profiles' lobby
+  await a.page.addInitScript(() => localStorage.setItem('warroom-tour2', 'done'))
+  await b.page.addInitScript(() => localStorage.setItem('warroom-tour2', 'done'))
+
   // /home is dynamic (under src/pages/(app)/), so it mounts the nav shell;
   // '/' is the static landing and has no navigation.
   await Promise.all([a.page.goto('/home'), b.page.goto('/home')])

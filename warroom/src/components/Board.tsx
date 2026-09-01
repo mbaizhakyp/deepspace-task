@@ -12,7 +12,8 @@ import { Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
 import { fitView, gridSpacing, toWorld, zoomView, type View } from '../lib/camera'
 import { leftRooms } from '../lib/left-rooms'
-import { TourOffer } from './Tour'
+import { TourResume } from './Tour'
+import { TrashIcon } from '../pages/(app)/(protected)/rooms'
 
 import { parseOptions, PollCard, type PollData, type VoteData } from './PollCard'
 import { ImportPanel } from './ImportPanel'
@@ -468,9 +469,11 @@ export default function Board({
         {/* leave/delete: inline two-step arm, no popups (D-019) */}
         <button
           onClick={leaveOrDelete}
-          className={`wire rounded-sm px-2 py-2 ${armedExit ? 'text-destructive' : 'text-chrome/70 hover:text-destructive'}`}
+          title={isFacilitator ? 'Delete this room' : 'Leave this room'}
+          aria-label={isFacilitator ? 'DELETE ROOM' : 'LEAVE'}
+          className={`wire flex items-center gap-1 rounded-sm px-2 py-2 ${armedExit ? 'text-destructive' : 'text-destructive/70 hover:text-destructive'}`}
         >
-          {armedExit ? 'SURE?' : isFacilitator ? 'DELETE ROOM' : 'LEAVE'}
+          {armedExit ? 'SURE?' : isFacilitator ? <TrashIcon /> : 'LEAVE'}
         </button>
       </div>
 
@@ -645,7 +648,7 @@ export default function Board({
       )}
       </div>
 
-      <TourOffer storageKey="warroom-tour-room" label="FIRST ROOM?" steps={ROOM_TOUR} />
+      <TourResume steps={ROOM_TOUR} />
 
       {/* frozen chrome */}
       {frozen && (
