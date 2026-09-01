@@ -332,3 +332,15 @@ Decisions: (a) JOIN turns solid orange the moment the field holds a valid code/l
 When: D-039/D-040 verification (focused two-user prod test — the row survived 6s with the room still alive)
 Root cause: leaving revokes YOUR read access to the room record, so the server cannot push the membership update to you — your client keeps rendering its last-readable copy, and no state change ever evicts it. Scoped-subscription staleness, invisible to happy-path tests because a reload fixes it.
 Fix: both leave paths record the id in a session-local set the lobby filters against (plus a render tick — a module Set doesn't re-render React). A full reload needs none of this; server scoping omits the room. · Verified: row gone immediately post-leave, room still alive.
+
+## B-016 · Reopening the import panel greeted a NEW import with the old "LANDED · N CARDS" · FIXED
+When: user report, round 7 · Where: ImportPanel.tsx
+Symptom: opening IMPORT after a past import showed the previous run's landed line under the fresh form.
+Root cause: two leaks of finished-job state into the form view — a residual success line rendered whenever the newest job was succeeded, and a job that finished before the panel opened was never marked stale (B-012 only staled jobs at submission time).
+Fix: the residual line is gone (a finished import reports once, in the journey; the board's wire log carries history), and any terminal job observed while the form is showing is marked stale on sight. · Verified on prod: panel-scoped check shows 0 "LANDED" in the panel after close→reopen; the wire log's IMPORT LANDED event (intended history) remains.
+
+## D-041 · "20 credits" for the QA account → raised server-side import allowance
+When: user request, round 7 ("give mbaizhakyp.job@gmail.com 20 credits, I'm testing from that account")
+Decision: the platform has no grantable credits mechanism (CLI has no credits verb; UserCredits is platform-managed), and the app's only scarcity is the per-room import quota — so "20 credits" became: allowlisted tester emails get a 20-imports-per-room allowance in the shared quota gate (checkQuotaAndEnqueue), checked server-side by looking up the caller's users record — a client cannot claim tester status. Everyone else keeps 3 free / Pro unlimited.
+Beats: gifting Pro (hides the paywall behavior the tester is meant to see) and a stored credits ledger (schema + two counters for one QA account).
+Note: unverifiable by me — test accounts aren't allowlisted and prod won't get fake allowlist entries; the user confirms from the .job account.

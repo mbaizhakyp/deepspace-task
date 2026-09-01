@@ -17,6 +17,18 @@ import { parseMemberIds } from './rooms'
 
 type RoomData = { memberIds: unknown; facilitatorId: string; importCount?: number }
 
+// Tester provision (D-041): the account the product owner QA-tests from gets
+// a raised per-room import allowance ("20 credits") without buying Pro.
+// Server-side by email — a client can't claim tester status.
+const TESTER_EMAILS = ['mbaizhakyp.job@gmail.com']
+const TESTER_IMPORT_LIMIT = 20
+
+async function isTester(t: AppActionTools, userId: string): Promise<boolean> {
+  const res = await t.get<{ email?: string }>('users', userId)
+  const email = res.success ? res.data?.record?.data?.email : undefined
+  return !!email && TESTER_EMAILS.includes(email.toLowerCase())
+}
+
 export const startImport: ActionHandler<Env> = async ({ userId, params, tools, env, callerJwt }) => {
   const t = tools as AppActionTools
   const roomId = typeof params.roomId === 'string' ? params.roomId : ''
@@ -45,8 +57,11 @@ export async function checkQuotaAndEnqueue(
   const isMember = room.facilitatorId === userId || parseMemberIds(room.memberIds).includes(userId)
   if (!isMember) return { success: false, error: 'not a member of this room' }
 
-  if ((room.importCount ?? 0) >= FREE_IMPORT_LIMIT) {
-    const entitled = await isProEntitled(env, callerJwt)
+  const used = room.importCount ?? 0
+  if (used >= FREE_IMPORT_LIMIT) {
+    const entitled =
+      (await isProEntitled(env, callerJwt)) ||
+      (used < TESTER_IMPORT_LIMIT && (await isTester(t, userId)))
     if (!entitled) {
       return { success: false, error: 'upgrade_required' }
     }

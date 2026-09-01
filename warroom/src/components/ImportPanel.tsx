@@ -57,6 +57,20 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
     }
   }, [running, current?.status])
 
+  // B-016: a job that FINISHED before this panel opened (or before the
+  // stepper was dismissed) is history, not status — without this, reopening
+  // the panel greeted every new import with the previous "LANDED · N CARDS".
+  useEffect(() => {
+    if (
+      newest &&
+      staleJobId === null &&
+      flow === 'form' &&
+      (newest.status === 'succeeded' || newest.status === 'failed')
+    ) {
+      setStaleJobId(newest.id)
+    }
+  }, [newest, staleJobId, flow])
+
   const succeeded = current?.status === 'succeeded'
   const jobProgress = current?.progress ?? 0
   // the job reports 0.05 CHECKING ACCESS / 0.15 READING THE DOCUMENT, then
@@ -428,11 +442,8 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
               {(submitError ?? current?.error ?? 'IMPORT FAILED').toUpperCase()}
             </div>
           )}
-          {current?.status === 'succeeded' && (
-            <div className="wire mt-3 text-live">
-              LANDED · {current.result?.created ?? 0} CARDS
-            </div>
-          )}
+          {/* no residual "LANDED" line here — a finished import reports once,
+              in the journey; the form always opens clean (B-016) */}
         </>
       )}
     </div>
