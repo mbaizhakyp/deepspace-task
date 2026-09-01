@@ -18,6 +18,7 @@ test('war room: live sync, one-vote polls, server-enforced freeze', async ({ use
 
   // ── A creates a room ────────────────────────────────────────────────
   await a.page.goto('/rooms')
+  await a.page.getByRole('button', { name: 'NEW ROOM' }).click()
   await a.page.getByPlaceholder(/Name a room/).fill('Freeze Proof')
   await a.page.getByRole('button', { name: 'Open a room' }).click()
   await a.page.waitForURL(/\/room\//, { timeout: 20_000 })

@@ -6,6 +6,7 @@ A persistent collaborative "war room": import a doc, work on it as live cards wi
 
 - `docs/REQUIREMENTS.md` — what we're building, scope decisions, gap review
 - `docs/PLAN.md` — staged implementation plan; tasks map 1:1 to commits
+- `docs/DECISIONS.md` — curated decision record (architecture/security/UX/process), the showcase companion to the buglog
 - `docs/BUGLOG.md` — bugs AND decisions log. **Discipline: every bug hit, every non-obvious decision made gets an entry at the moment it happens, not retroactively.**
 - `design-brief.md` — visual identity ("newsroom wire terminal"); exact tokens live there
 - `.agents/skills/deepspace/SKILL.md` — DeepSpace operating rules (auto-loads)

@@ -43,6 +43,7 @@
 
   /* Artifact (paper) + signal tokens */
   --color-paper: #f4f1e8;
+  --color-manila: #ece3cc; /* imported cards — wire dispatches on manila stock */
   --color-ink: #1a1a16;
   --color-ink-muted: #6e6a5e;
   --color-chrome: #9ba59b;
@@ -245,6 +246,47 @@
   /* Prevent 300ms tap delay on mobile */
   a, button, [role="button"], input, select, textarea {
     touch-action: manipulation;
+  }
+}
+
+/* ── Day edition (D-027): light chrome, same paper. The night desk is the
+   default; this flips only the ROOM's chrome to newsprint — artifacts (paper,
+   ink, orange) are identical in both editions. Toggled from the nav, stored
+   in localStorage, first-paint handled in index.html. ── */
+[data-theme="day"] {
+  --color-background: #e7e3d8;
+  --color-foreground: #1a1a16;
+  --color-card: #f0ece1;
+  --color-card-foreground: #1a1a16;
+  --color-popover: #f0ece1;
+  --color-popover-foreground: #1a1a16;
+  --color-secondary: #f0ece1;
+  --color-secondary-foreground: #1a1a16;
+  --color-muted: #dcd7c9;
+  --color-muted-foreground: #6e6a5e;
+  --color-accent: #dcd7c9;
+  --color-accent-foreground: #1a1a16;
+  --color-border: #c9c4b2;
+  --color-input: #c9c4b2;
+  --color-chrome: #6e6a5e;
+  --color-live: #15803d; /* phosphor green fails on newsprint; forest reads */
+  color-scheme: light;
+}
+
+/* ── Print: the dispatch sheet is the page (PRINT/PDF export, D-030) ── */
+@media print {
+  body * {
+    visibility: hidden;
+  }
+  .dispatch-sheet,
+  .dispatch-sheet * {
+    visibility: visible;
+  }
+  .dispatch-sheet {
+    position: absolute;
+    inset: 0;
+    width: 100%;
+    box-shadow: none;
   }
 }
 

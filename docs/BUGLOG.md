@@ -248,3 +248,32 @@ Beats: per-button accent colors (rainbow chrome violates the palette) and icon-o
 When: user feedback round 2 ("add poll deletion button" — it existed, creator-only and easy to miss)
 Decision: polls schema widens member delete to `true`; a new pollDeleteDenial guard in worker.ts rejects deletes from anyone but the creator or facilitator (RBAC can't express "facilitator"). UI shows the delete chip to creator and facilitator.
 Verified: spec asserts the facilitator deleting a member's poll syncs to both windows; the deny path mirrors the already-adversarially-tested pollStatusDenial pattern (a 3rd non-creator account would be needed to raw-test it — noted, not faked).
+
+## B-012 · Import journey flashed all-green when starting a second import · FIXED
+When: user feedback round 3 · Where: `src/components/ImportPanel.tsx`
+Symptom: on a repeat import the stepper opened with every checkpoint green for a few seconds, then reset and ran properly.
+Root cause: the panel rendered the newest `import-text` job — which, until the fresh job's record arrives, is the PREVIOUS succeeded one.
+Fix: starting an import marks the prior job id stale; the stepper only reads a job newer than that. · Verified: prod repeat import opens on step 1.
+
+## D-027 · Day edition: a second theme, not a generic dark/light switch
+When: user feedback round 3 ("dark/light mode icon would be nice")
+Decision: a "day edition" theme — chrome flips to newsprint (#e7e3d8 ground, ink text, forest green for live signals since phosphor fails on light), artifacts (paper, ink, the one orange) are IDENTICAL in both editions. Toggled from the nav (sun/moon glyph, DAY/NIGHT), persisted in localStorage, applied pre-paint in index.html to avoid a flash. Deviates from the brief's "dark, always" — user override, and the newsroom day-desk/night-desk framing keeps it in identity.
+Beats: a stock light theme (would relight the paper cards and break the chrome-vs-artifact tension).
+
+## D-028 · Lobby: front-page masthead + one-intent-at-a-time forms
+When: user feedback round 3
+Decision: the lobby reads like a newspaper front page (double-rule masthead, serif "The Warroom", mono edition line with the date and free-tier terms, dotgrid ground). Create/join collapsed behind two buttons — NEW ROOM / JOIN BY LINK — the field appears only after picking an intent (user's suggestion, agreed: less clutter, and the empty state stops looking like a form dump).
+Beats: decorative backgrounds (gradients/illustrations are banned by the brief; the masthead IS the theme).
+
+## D-029 · In-room exits: ← LOBBY always, LEAVE for members, DELETE ROOM for facilitator
+When: user feedback round 3 ("no intuitive back/leave or delete room buttons")
+Decision: back link in the room header; a two-step armed (D-019, no popups) LEAVE (members — new leave-room server action that strips the caller from memberIds; the facilitator is refused and told to delete instead) or DELETE ROOM (facilitator — existing action, now reachable without returning to the lobby).
+Beats: a hamburger/overflow menu (hides the two actions people actually asked for).
+
+## D-030 · Imported cards on manila; summary exports = .md + print/PDF; summary progress goes checkpoint-style
+When: user feedback round 3
+Decisions: (a) imported cards render on manila stock (new --color-manila token) vs house paper for added cards — the origin label alone wasn't scannable at board distance. (b) Summary export adds PRINT / PDF via a print stylesheet that makes the dispatch sheet the printed page — a real PDF path with zero dependencies; declined a PDF library (weight for no gain). (c) The summary's progress adopts the import journey's checkpoint visuals while keeping its honest elapsed-time semantics (D-018 — the code and log still say the stages are timed, not observed).
+
+## D-031 · docs/DECISIONS.md — curated decision record, committed (not gitignored)
+When: user feedback round 3 ("make a document for these decisions; decide whether git should ignore it")
+Decision: a showcase-ready decision record distilled from this log (architecture, security, integrations, UX, process), committed to the repo — the exercise scores how decisions were made, so the record is part of the deliverable, not a private note. BUGLOG.md stays the chronological source of truth; DECISIONS.md points into it.

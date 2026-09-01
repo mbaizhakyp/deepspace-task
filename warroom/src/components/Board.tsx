@@ -6,6 +6,7 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
 import { getUserColor, useAuthUser, useJobs, useMutations, usePresenceRoom, useQuery } from 'deepspace'
 import { Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
@@ -284,6 +285,23 @@ export default function Board({
     }
   }
 
+  // ── leave (member) / delete (facilitator), armed two-step like the lobby ──
+  const navigate = useNavigate()
+  const [armedExit, setArmedExit] = useState(false)
+  async function leaveOrDelete() {
+    if (!armedExit) {
+      setArmedExit(true)
+      setTimeout(() => setArmedExit(false), 2500)
+      return
+    }
+    setArmedExit(false)
+    const res = isFacilitator
+      ? await callAction('delete-room', { roomId })
+      : await callAction('leave-room', { roomId, userName: user?.fullName ?? '' })
+    if (res.success) navigate('/rooms')
+    else warning(isFacilitator ? 'Could not delete the room' : 'Could not leave', res.error)
+  }
+
   async function toggleFreeze() {
     const res = await callAction('set-freeze', {
       roomId,
@@ -297,6 +315,13 @@ export default function Board({
     <div className="relative flex h-full flex-col overflow-hidden">
       {/* header */}
       <div className="flex h-14 flex-none items-center gap-4 border-b border-border bg-card px-5">
+        <Link
+          to="/rooms"
+          title="Back to the lobby"
+          className="wire -ml-1 rounded-sm px-1.5 py-2 text-chrome hover:text-foreground"
+        >
+          ← LOBBY
+        </Link>
         <h1 className="font-serif text-2xl text-foreground">{roomName}</h1>
         <div className="flex-1" />
         <div className="flex items-center pl-1">
@@ -368,6 +393,13 @@ export default function Board({
           className="rounded-sm bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground"
         >
           Summarize
+        </button>
+        {/* leave/delete: inline two-step arm, no popups (D-019) */}
+        <button
+          onClick={leaveOrDelete}
+          className={`wire rounded-sm px-2 py-2 ${armedExit ? 'text-destructive' : 'text-chrome/70 hover:text-destructive'}`}
+        >
+          {armedExit ? 'SURE?' : isFacilitator ? 'DELETE ROOM' : 'LEAVE'}
         </button>
       </div>
 
@@ -595,7 +627,8 @@ function BoardCard({
 
   return (
     <div
-      className={`card-drop absolute w-64 rounded-sm bg-paper p-4 shadow-[0_2px_6px_rgba(26,26,22,.35)] ${shake ? 'locked-shake' : ''} ${dragPos ? 'z-30' : 'z-10'}`}
+      // imported cards land on manila stock — wire dispatches vs. house paper
+      className={`card-drop absolute w-64 rounded-sm p-4 shadow-[0_2px_6px_rgba(26,26,22,.35)] ${data.origin === 'imported' ? 'bg-manila' : 'bg-paper'} ${shake ? 'locked-shake' : ''} ${dragPos ? 'z-30' : 'z-10'}`}
       style={{ left: x, top: y, transform: `rotate(${rotationFor(id)}deg)` }}
       onDoubleClick={() => {
         if (locked) return

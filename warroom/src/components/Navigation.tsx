@@ -28,6 +28,67 @@ import {
   DropdownMenuTrigger,
 } from './ui'
 
+/** Mono wall clock — the newsroom is always on the clock. */
+function WireClock() {
+  const [now, setNow] = useState(() => new Date())
+  useEffect(() => {
+    const id = setInterval(() => setNow(new Date()), 1000)
+    return () => clearInterval(id)
+  }, [])
+  const hh = String(now.getHours()).padStart(2, '0')
+  const mm = String(now.getMinutes()).padStart(2, '0')
+  const ss = String(now.getSeconds()).padStart(2, '0')
+  const date = now
+    .toLocaleDateString(undefined, { weekday: 'short', month: 'short', day: 'numeric' })
+    .toUpperCase()
+  return (
+    <span className="wire hidden items-center gap-2 text-chrome lg:flex" aria-hidden>
+      <span className="breathe h-1.5 w-1.5 rounded-full bg-live" />
+      <span>{date}</span>
+      <span className="tabular-nums text-foreground/80">
+        {hh}:{mm}
+        <span className="text-chrome/60">:{ss}</span>
+      </span>
+    </span>
+  )
+}
+
+/** Day/night desk toggle (D-027) — persisted, applied pre-paint in index.html. */
+function ThemeToggle() {
+  const [day, setDay] = useState(() => document.documentElement.dataset.theme === 'day')
+  function toggle() {
+    const next = !day
+    setDay(next)
+    document.documentElement.dataset.theme = next ? 'day' : 'slate'
+    try {
+      localStorage.setItem('warroom-theme', next ? 'day' : 'night')
+    } catch {
+      /* private windows: theme just won't persist */
+    }
+  }
+  return (
+    <button
+      onClick={toggle}
+      title={day ? 'Back to the night desk' : 'Switch to the day edition'}
+      className="wire flex items-center gap-1.5 rounded-sm border border-border px-2.5 py-1.5 text-chrome hover:border-chrome hover:text-foreground"
+    >
+      <svg width="12" height="12" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden>
+        {day ? (
+          // moon — click for night
+          <path d="M9.5 7.5A4.5 4.5 0 014.6 1.6 4.5 4.5 0 106 10.5c1.5 0 2.8-.7 3.5-3z" />
+        ) : (
+          // sun — click for day
+          <>
+            <circle cx="6" cy="6" r="2.4" />
+            <path d="M6 .8v1.4M6 9.8v1.4M.8 6h1.4M9.8 6h1.4M2.3 2.3l1 1M8.7 8.7l1 1M9.7 2.3l-1 1M3.3 8.7l-1 1" />
+          </>
+        )}
+      </svg>
+      {day ? 'NIGHT' : 'DAY'}
+    </button>
+  )
+}
+
 export default function Navigation() {
   const { isLoaded, isSignedIn, user, userLoading } = useAuthProfileReady({ requireUser: true })
   const location = useLocation()
@@ -58,11 +119,13 @@ export default function Navigation() {
         to={item.path}
         aria-current={active ? 'page' : undefined}
         className={cn(
-          'px-3 py-1.5 text-sm',
-          active ? 'text-foreground' : 'text-muted-foreground hover:text-foreground',
+          'wire border-b px-3 py-1.5',
+          active
+            ? 'border-primary text-foreground'
+            : 'border-transparent text-chrome hover:text-foreground',
         )}
       >
-        {item.label}
+        {item.label.toUpperCase()}
       </Link>
     )
   }
@@ -71,13 +134,20 @@ export default function Navigation() {
     <>
       <nav data-testid="app-navigation" className="border-b border-border bg-background">
         <div className="mx-auto flex h-12 max-w-7xl items-center gap-4 px-4">
-          <Link to="/home" className="text-sm font-semibold text-foreground">
-            {APP_NAME}
+          <Link to="/home" className="flex items-baseline gap-2">
+            <span className="font-serif text-xl tracking-tight text-foreground">{APP_NAME}</span>
+            <span className="wire hidden text-[9px] text-chrome/60 sm:inline">
+              THE MEETING IS THE ARTIFACT
+            </span>
           </Link>
 
+          <div className="mx-1 hidden h-5 w-px bg-border md:block" />
           <div className="hidden items-center md:flex">{visibleNav.map(navLink)}</div>
 
           <div className="flex-1" />
+
+          <WireClock />
+          <ThemeToggle />
 
           {!isLoaded ? null : isSignedIn && !profileReady ? (
             /* Signed in, profile still loading — skeleton pill, never the

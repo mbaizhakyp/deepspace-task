@@ -28,7 +28,13 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
   const [docs, setDocs] = useState<GDocListing[] | null>(null)
   const [browsing, setBrowsing] = useState(false)
 
-  const current = jobs.find((j) => j.type === 'import-text')
+  // B-012: when a NEW import starts, the previous succeeded job is still the
+  // newest in the list until the fresh one lands — rendering the stepper from
+  // it flashed all-green. Starting an import marks the old job stale; the
+  // stepper only ever reads a job newer than that.
+  const [staleJobId, setStaleJobId] = useState<string | null>(null)
+  const newest = jobs.find((j) => j.type === 'import-text')
+  const current = newest && newest.id !== staleJobId ? newest : undefined
   const running = current?.status === 'queued' || current?.status === 'running'
 
   // ── the journey (D-023): checkpoints bound to REAL signals only ──────
@@ -113,6 +119,7 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
     setConnecting(false)
     // the Google fetch happens inside the action, before the job exists —
     // show the journey now so the PULLING step is live, not retroactive
+    setStaleJobId(newest?.id ?? null)
     setViaGdoc(true)
     setEnqueued(false)
     setFlow('progress')
@@ -142,6 +149,7 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
     const input = source === 'paste' ? text.trim() : docUrl.trim()
     if (!input || running || submitting) return
     if (source === 'gdoc') return importDoc({ url: docUrl })
+    setStaleJobId(newest?.id ?? null) // B-012: never render the old job's steps
     setSubmitting(true)
     setSubmitError(null)
     setNeedsUpgrade(false)

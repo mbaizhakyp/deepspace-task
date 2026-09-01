@@ -71,42 +71,84 @@ export default function RoomsPage() {
     if (!res.success) error('Could not delete the room', res.error)
   }
 
+  // one intent at a time (user feedback): the lobby leads with two buttons;
+  // the matching field appears only once you've picked an intent
+  const [intent, setIntent] = useState<'none' | 'create' | 'join'>('none')
+
+  const today = new Date()
+    .toLocaleDateString(undefined, { weekday: 'long', month: 'long', day: 'numeric', year: 'numeric' })
+    .toUpperCase()
+
   return (
-    <div className="mx-auto max-w-3xl px-6 py-12">
-      <div className="wire text-chrome">LOBBY</div>
-      <h1 className="mt-1 font-serif text-4xl text-foreground">Your rooms</h1>
+    <div className="dotgrid min-h-full">
+      <div className="mx-auto max-w-3xl px-6 py-12">
+        {/* masthead — the lobby reads like a front page */}
+        <div className="border-y-2 border-foreground/70 py-1">
+          <div className="wire flex items-baseline justify-between border-b border-border pb-1 text-[10px] text-chrome">
+            <span>{today}</span>
+            <span>DECISIONS DAILY</span>
+            <span>FREE EDITION · 3 IMPORTS PER ROOM</span>
+          </div>
+          <h1 className="py-3 text-center font-serif text-6xl tracking-tight text-foreground">
+            The Warroom
+          </h1>
+        </div>
 
-      <div className="mt-8 flex gap-3">
-        <Input
-          value={name}
-          onChange={(e) => setName(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && create()}
-          placeholder="Name a room — 'Q3 launch plan'"
-          className="flex-1"
-        />
-        <Button onClick={create} disabled={creating || !name.trim()}>
-          Open a room
-        </Button>
-      </div>
+        <div className="mt-8 flex gap-3">
+          <button
+            onClick={() => setIntent(intent === 'create' ? 'none' : 'create')}
+            className={`wire flex-1 rounded-sm border px-4 py-3.5 ${intent === 'create' ? 'border-primary text-primary' : 'border-border text-chrome hover:border-chrome hover:text-foreground'}`}
+          >
+            + NEW ROOM
+          </button>
+          <button
+            onClick={() => setIntent(intent === 'join' ? 'none' : 'join')}
+            className={`wire flex-1 rounded-sm border px-4 py-3.5 ${intent === 'join' ? 'border-primary text-primary' : 'border-border text-chrome hover:border-chrome hover:text-foreground'}`}
+          >
+            → JOIN BY LINK
+          </button>
+        </div>
 
-      <div className="mt-3 flex gap-3">
-        <Input
-          value={joinCode}
-          onChange={(e) => setJoinCode(e.target.value)}
-          onKeyDown={(e) => e.key === 'Enter' && joinByCode()}
-          placeholder="Invited? Paste the room link or code"
-          className="flex-1"
-        />
-        <button
-          onClick={joinByCode}
-          disabled={!parseRoomCode(joinCode)}
-          className="wire rounded-sm border border-border px-4 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-40"
-        >
-          JOIN
-        </button>
-      </div>
+        {intent === 'create' && (
+          <div className="mt-3 flex gap-3">
+            <Input
+              autoFocus
+              value={name}
+              onChange={(e) => setName(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && create()}
+              placeholder="Name a room — 'Q3 launch plan'"
+              className="flex-1"
+            />
+            <Button onClick={create} disabled={creating || !name.trim()}>
+              Open a room
+            </Button>
+          </div>
+        )}
 
-      <div className="mt-10 flex flex-col gap-2">
+        {intent === 'join' && (
+          <div className="mt-3 flex gap-3">
+            <Input
+              autoFocus
+              value={joinCode}
+              onChange={(e) => setJoinCode(e.target.value)}
+              onKeyDown={(e) => e.key === 'Enter' && joinByCode()}
+              placeholder="Paste the room link or code you were sent"
+              className="flex-1"
+            />
+            <button
+              onClick={joinByCode}
+              disabled={!parseRoomCode(joinCode)}
+              className="wire rounded-sm border border-border px-4 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-40"
+            >
+              JOIN
+            </button>
+          </div>
+        )}
+
+        <div className="wire mt-10 border-b border-border pb-1 text-[10px] text-chrome">
+          YOUR ROOMS
+        </div>
+        <div className="mt-3 flex flex-col gap-2">
         {status === 'ready' && rooms.length === 0 && (
           <p className="text-sm text-muted-foreground">
             Nothing here yet. Open a room, or ask someone for their room link.
@@ -153,6 +195,7 @@ export default function RoomsPage() {
             </div>
           )
         })}
+        </div>
       </div>
     </div>
   )

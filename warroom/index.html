@@ -26,8 +26,16 @@
     <style>
       html { background-color: #101210; color-scheme: dark; }
       html[data-theme="paper"] { background-color: #ffffff; color-scheme: light; }
+      html[data-theme="day"] { background-color: #e7e3d8; color-scheme: light; }
       /* Add one line per theme you create, mirroring its --color-background. */
     </style>
+    <!-- Day/night choice applies before first paint (no theme flash) -->
+    <script>
+      try {
+        var t = localStorage.getItem('warroom-theme')
+        if (t === 'day') document.documentElement.dataset.theme = 'day'
+      } catch (e) {}
+    </script>
   </head>
   <body>
     <div id="root"></div>

@@ -85,6 +85,23 @@ export const joinRoom: ActionHandler<Env> = async ({ userId, params, tools }) =>
   return { success: true, data: { roomId } }
 }
 
+export const leaveRoom: ActionHandler<Env> = async ({ userId, params, tools }) => {
+  const t = tools as AppActionTools
+  const roomId = typeof params.roomId === 'string' ? params.roomId : ''
+  const userName = typeof params.userName === 'string' ? params.userName.slice(0, 80) : 'someone'
+  if (!roomId) return { success: false, error: 'roomId required' }
+
+  const room = await getRoom(t, roomId)
+  if (!room) return { success: false, error: 'room not found' }
+  if (room.data.facilitatorId === userId) {
+    return { success: false, error: 'the facilitator cannot leave their own room — delete it instead' }
+  }
+  const members = parseMemberIds(room.data.memberIds).filter((id) => id !== userId)
+  await t.update('rooms', roomId, { memberIds: members })
+  await logEvent(t, roomId, `${userName.toUpperCase()} LEFT THE ROOM`)
+  return { success: true, data: { roomId } }
+}
+
 export const deleteRoom: ActionHandler<Env> = async ({ userId, params, tools }) => {
   const t = tools as AppActionTools
   const roomId = typeof params.roomId === 'string' ? params.roomId : ''

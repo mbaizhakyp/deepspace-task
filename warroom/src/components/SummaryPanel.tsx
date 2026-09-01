@@ -65,7 +65,7 @@ export function SummaryPanel({
   }
 
   return (
-    <div className="flex w-[26rem] flex-none flex-col overflow-y-auto bg-paper p-8 shadow-[-4px_0_12px_rgba(0,0,0,.4)]">
+    <div className="dispatch-sheet flex w-[26rem] flex-none flex-col overflow-y-auto bg-paper p-8 shadow-[-4px_0_12px_rgba(0,0,0,.4)]">
       <div className="wire flex items-center justify-between text-[10px] text-ink-muted">
         <span>DISPATCH · {roomName.toUpperCase().slice(0, 24)}</span>
         <button
@@ -80,16 +80,41 @@ export function SummaryPanel({
       </div>
 
       {working ? (
-        <div className="mt-6">
-          <div className="h-0.5 rounded-full bg-ink/10">
-            <div
-              className="h-0.5 rounded-full bg-signal transition-all duration-1000"
-              style={{ width: `${[15, 55, 85][stage]}%` }}
-            />
-          </div>
-          <div className="wire wire-tick mt-3 text-ink" key={stage}>
-            {STAGES[stage]}
-          </div>
+        // same checkpoint language as the import journey — still honest
+        // elapsed-time stages (one AI call, no real per-stage signal, D-018)
+        <div className="mt-6 flex flex-col">
+          {STAGES.map((label, i) => (
+            <div key={label} className="flex gap-3">
+              <div className="flex flex-col items-center">
+                {i < stage ? (
+                  <span className="flex h-4 w-4 flex-none items-center justify-center rounded-full border border-signal text-signal">
+                    <svg width="8" height="8" viewBox="0 0 8 8" fill="none">
+                      <path d="M1 4.2 L3 6.2 L7 1.8" stroke="currentColor" strokeWidth="1.4" />
+                    </svg>
+                  </span>
+                ) : i === stage ? (
+                  <span className="flex h-4 w-4 flex-none items-center justify-center rounded-full border border-signal">
+                    <span className="breathe h-1.5 w-1.5 rounded-full bg-signal" />
+                  </span>
+                ) : (
+                  <span className="h-4 w-4 flex-none rounded-full border border-ink/20" />
+                )}
+                {i < STAGES.length - 1 && (
+                  <div className="relative my-1 w-px flex-1 bg-ink/15" style={{ minHeight: 16 }}>
+                    <div
+                      className="absolute inset-x-0 top-0 bg-signal transition-all duration-700"
+                      style={{ height: i < stage ? '100%' : '0%' }}
+                    />
+                  </div>
+                )}
+              </div>
+              <div
+                className={`wire flex-1 pb-3 pt-px ${i < stage ? 'text-signal' : i === stage ? 'text-ink' : 'text-ink-muted/60'}`}
+              >
+                {label}
+              </div>
+            </div>
+          ))}
         </div>
       ) : summary ? (
         <>
@@ -122,9 +147,15 @@ export function SummaryPanel({
           {working ? 'Writing…' : summary ? 'Refresh' : 'Summarize the board'}
         </button>
         {summary && (
-          <button onClick={download} className="wire text-ink-muted hover:text-ink">
-            DOWNLOAD .MD
-          </button>
+          <>
+            <button onClick={download} className="wire text-ink-muted hover:text-ink">
+              .MD
+            </button>
+            {/* PDF for free via the print stylesheet — only the dispatch prints */}
+            <button onClick={() => window.print()} className="wire text-ink-muted hover:text-ink">
+              PRINT / PDF
+            </button>
+          </>
         )}
       </div>
       {error && <div className="wire mt-3 text-destructive">{error.toUpperCase()}</div>}
