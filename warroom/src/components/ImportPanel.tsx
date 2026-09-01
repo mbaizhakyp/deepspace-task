@@ -10,6 +10,7 @@ import { Link } from 'react-router-dom'
 import { useAuthUser, useJobs } from 'deepspace'
 import { callAction } from '../lib/actions-client'
 import type { GDocListing } from '../actions/google-docs'
+import { collectRun, createdParts } from '../lib/import-run'
 
 type ImportPayload = { roomId: string; text: string; mode: 'cards' | 'key-points'; userName?: string }
 type ImportResult = { created?: number }
@@ -86,16 +87,27 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
   }, [flow])
   const elapsed = startRef.current ? Math.max(0, Math.floor(((nowMs || Date.now()) - startRef.current) / 1000)) : 0
 
+  // ── B-018: a multi-doc run is SEVERAL jobs (one per doc, FIFO). The run =
+  // every import-text job newer than the stale marker; the LANDED count must
+  // sum them (the old code read only the newest job — the LAST doc's count).
+  const runJobs = collectRun(jobs, staleJobId)
+  // the newest job is enqueued last and runs last — its success means the run is done
   const succeeded = current?.status === 'succeeded'
-  const jobProgress = current?.progress ?? 0
+  // progress must follow the job that is actually RUNNING, not the newest
+  const live = runJobs.find((j) => j.status === 'running') ?? current
+  const jobProgress = live?.progress ?? 0
   // the job reports 0.05 CHECKING ACCESS / 0.15 READING THE DOCUMENT, then
   // per-card ticks above 0.15 — that boundary splits segmenting from cards
-  const makingCards = jobProgress > 0.15
+  const makingCards = !succeeded && jobProgress > 0.15
+  const docsDone = runJobs.filter((j) => j.status === 'succeeded').length
+  // chronological per-doc counts → "5 + 3 + 4 = 12 CARDS" for multi-doc runs
+  const parts = createdParts(runJobs)
+  const runCreated = parts.reduce((n, c) => n + c, 0)
   type StepState = 'done' | 'active' | 'pending'
   const steps: { label: string; state: StepState; detail?: string; bar?: number }[] = [
     ...(viaGdoc
       ? [{
-          label: 'PULLING THE DOC FROM GOOGLE',
+          label: viaGdoc && queuedCount > 1 ? 'PULLING THE DOCS FROM GOOGLE' : 'PULLING THE DOC FROM GOOGLE',
           state: (enqueued || current ? 'done' : submitting ? 'active' : 'pending') as StepState,
         }]
       : []),
@@ -106,13 +118,15 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
     {
       label: 'MAKING CARDS',
       state: succeeded ? 'done' : makingCards ? 'active' : 'pending',
-      detail: !succeeded && makingCards ? current?.progressMessage : undefined,
+      detail: !succeeded && makingCards ? live?.progressMessage : undefined,
       bar: succeeded ? 1 : makingCards ? (jobProgress - 0.15) / 0.85 : undefined,
     },
     {
       label: 'LANDED ON THE BOARD',
       state: succeeded ? 'done' : 'pending',
-      detail: succeeded ? `${current?.result?.created ?? 0} CARDS · BOARD CENTERED ON THEM` : undefined,
+      detail: succeeded
+        ? `${parts.length > 1 ? `${parts.join(' + ')} = ${runCreated}` : runCreated} CARDS · BOARD CENTERED ON THEM`
+        : undefined,
     },
   ]
 
@@ -239,7 +253,9 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
           </div>
           {queuedCount > 1 && (
             <div className="wire mt-1.5 text-[10px] text-chrome">
-              {queuedCount} DOCS QUEUED · CARDS LAND AS EACH FINISHES
+              {succeeded
+                ? `${queuedCount} DOCS IMPORTED`
+                : `DOC ${Math.min(docsDone + 1, queuedCount)}/${queuedCount} · CARDS LAND AS EACH FINISHES`}
             </div>
           )}
           <div className="mt-6 flex flex-col">

@@ -395,3 +395,9 @@ Decisions:
 - Tour steps can carry a short looping demo clip: three ~550px webm videos (import, poll, summarize) recorded with Playwright against prod itself, served from /public/tour (~575KB total), autoplay-muted inside the callout. webm in a <video> beats GIF: smaller, sharper, no conversion tooling.
 - The solid button tier now tracks the theme via new --color-btn tokens: warm paper chips on the night desk, pressed deep-tan (#c6bfa7) chips on newsprint — the user's "always white" complaint; verified computed backgrounds differ per theme on prod.
 Also: the unused-eslint-disable → vite-overlay → suite-blocked failure recurred (B-010's pattern, caught by the suite again) — directive removed.
+
+## B-018 · Multi-doc import's LANDED count showed only the last doc · FIXED
+When: user report, round 13 ("4 CARDS" after importing several documents)
+Symptom: after a multi-select Google Docs import, LANDED ON THE BOARD reported the final document's card count alone.
+Root cause: a multi-doc run is N sequential jobs, and every stepper read (`current`) pointed at the NEWEST job — correct for run-done detection (newest runs last), wrong for totals and mid-run progress.
+Fix: the run = every import-text job newer than the stale marker (pure `collectRun`/`createdParts` in src/lib/import-run.ts, unit-tested with the exact newest-first + stale-cutoff scenario). LANDED now shows the user's suggested shape — "5 + 3 + 4 = 12 CARDS"; the MAKING CARDS bar/message follows the job that is actually RUNNING; the header line counts "DOC k/N" live.

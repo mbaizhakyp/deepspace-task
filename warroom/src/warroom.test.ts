@@ -140,6 +140,31 @@ describe('parseJoinInput (lobby join field: url, id, or short code)', () => {
   })
 })
 
+describe('multi-doc import run aggregation (B-018)', () => {
+  const J = (id: string, status: string, created?: number) => ({
+    id,
+    type: 'import-text',
+    status,
+    result: created === undefined ? undefined : { created },
+  })
+  it('sums the whole run — not just the last doc — and stops at the stale marker', async () => {
+    const { collectRun, createdParts } = await import('./lib/import-run')
+    // newest-first, as the platform hands them: doc3 (4 cards) enqueued last;
+    // "old" finished before this run and is the stale marker
+    const jobs = [J('doc3', 'succeeded', 4), J('doc2', 'succeeded', 3), J('doc1', 'succeeded', 5), J('old', 'succeeded', 9)]
+    const run = collectRun(jobs, 'old')
+    expect(run.map((j) => j.id)).toEqual(['doc3', 'doc2', 'doc1'])
+    const parts = createdParts(run)
+    expect(parts).toEqual([5, 3, 4]) // chronological — the "5 + 3 + 4" display
+    expect(parts.reduce((n, c) => n + c, 0)).toBe(12) // the total, not 4
+  })
+  it('null stale marker takes every run job; other job types are ignored', async () => {
+    const { collectRun } = await import('./lib/import-run')
+    const jobs = [J('a', 'running'), { id: 'x', type: 'other-job', status: 'succeeded' }, J('b', 'queued')]
+    expect(collectRun(jobs, null).map((j) => j.id)).toEqual(['a', 'b'])
+  })
+})
+
 describe('parseMemberIds (stored membership json)', () => {
   it('accepts arrays and JSON strings', () => {
     expect(parseMemberIds(['a', 'b'])).toEqual(['a', 'b'])
