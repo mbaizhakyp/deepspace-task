@@ -58,8 +58,10 @@ export const pollsSchema: CollectionSchema = {
     viewer: { read: true, create: false, update: false, delete: false },
     // members may open polls and move them; closing stamps closedAt via the
     // same update (creator or facilitator — checked in UI; a member forging a
-    // close only ends a vote early, it cannot forge results)
-    member: { read: true, create: true, update: true, delete: 'own' },
+    // close only ends a vote early, it cannot forge results).
+    // delete is `true` here but narrowed to creator-or-facilitator by
+    // pollDeleteDenial in worker.ts — RBAC can't express "facilitator".
+    member: { read: true, create: true, update: true, delete: true },
     admin: { read: true, create: true, update: true, delete: true },
   },
 }

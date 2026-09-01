@@ -109,15 +109,16 @@ describe('board camera (pan/zoom math, D-022)', () => {
     expect(v.x + 300 * v.scale).toBeCloseTo(600) // cluster center x → viewport center
     expect(v.y + 200 * v.scale).toBeCloseTo(400)
     // huge cluster: scales down to fit, respecting MIN_SCALE
+    const { MIN_SCALE } = await import('./lib/camera')
     const wide = fitView(0, 0, 10000, 400, 1200, 800)
-    expect(wide.scale).toBeGreaterThanOrEqual(0.35)
+    expect(wide.scale).toBeGreaterThanOrEqual(MIN_SCALE)
     expect(wide.scale).toBeLessThan(1)
   })
-  it('clampView never lets the board leave the viewport entirely', async () => {
-    const { clampView } = await import('./lib/camera')
-    const lost = clampView({ x: -99999, y: 99999, scale: 1 }, 1200, 800, 2400, 1400)
-    expect(lost.x).toBe(160 - 2400) // right edge of world still 160px on-screen
-    expect(lost.y).toBe(800 - 160) // top edge of world still 160px on-screen
+  it('gridSpacing subdivides so dots never crowd below 12px', async () => {
+    const { gridSpacing } = await import('./lib/camera')
+    expect(gridSpacing(1)).toBe(24)
+    expect(gridSpacing(0.2)).toBeGreaterThanOrEqual(12) // 4.8 → doubled up to 19.2
+    expect(gridSpacing(0.2)).toBeCloseTo(19.2)
   })
 })
 

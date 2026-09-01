@@ -225,3 +225,26 @@ When: D-023 verification · Where: dev server, `vite-plugin-checker-error-overla
 Symptom: 3 specs failed with "overlay intercepts pointer events"; ESLint reported 0 errors, 1 warning (an unused eslint-disable directive in Board.tsx).
 Root cause: the checker overlay covers the app for warnings too, eating every click in headless runs.
 Fix: removed the unused directive (the deps lint didn't actually fire on `importJob?.status`). · Verified: lint clean, 11 Playwright green.
+
+## B-011 · Second import stacked its cards on top of the first batch · FIXED
+When: user feedback round 2 · Where: `src/jobs.ts` importText
+Symptom: every import placed its grid at the same fixed origin (60,80), so batch 2 landed exactly on batch 1.
+Root cause: placement never looked at what was already on the board.
+Fix: the job queries existing cards and starts its grid below their max y; it also returns this batch's bbox in the job result so clients center the camera on the NEW cards only. · Verified on prod: two live imports → rows at y=80 and y=340, zero overlap (docs/screenshots/ux-reset-fits-all.png).
+
+## D-024 · Canvas goes unlimited; RESET becomes fit-all (reverses part of D-022)
+When: user feedback round 2 (asked twice: "make the canvas unlimited")
+Decision: no world bounds — coordinates are unbounded, pan is unclamped, zoom floor drops to 20%, the dot grid paints on the viewport (shifted/scaled with the camera, subdividing so dots never crowd below 12px). RESET now glide-fits every card and poll into the window instead of jumping to origin — the "way home" that made bounds unnecessary. New cards/polls spawn at the viewer's current view center.
+Why: D-022 chose bounds to prevent getting lost; the user's own pairing (unlimited + fit-all reset) solves that better.
+Beats: keeping the 2400×1400 table (artificial walls users hit while spreading out).
+
+## D-025 · Toolbar differentiation: line glyphs + group separators, not color or emoji
+When: user feedback round 2 ("buttons not differentiated visually — brainstorm")
+Decision: each toolbar button gets a 14px mono-weight line glyph (person+ invite, snowflake freeze, tray-arrow import, chart-bars poll, square+ card) and hairline separators split room controls | board actions | the one orange Summarize ask. Close/delete affordances grew: bordered CLOSE ✕ on panels, bordered DELETE/CLOSE chips on polls, larger card ×.
+Why: recognizability without breaking the wire voice — the brief bans emoji in chrome and allows one orange ask, so glyphs + grouping were the levers left.
+Beats: per-button accent colors (rainbow chrome violates the palette) and icon-only buttons (labels carry the wire identity).
+
+## D-026 · Facilitator can delete any poll; server narrows via DO guard
+When: user feedback round 2 ("add poll deletion button" — it existed, creator-only and easy to miss)
+Decision: polls schema widens member delete to `true`; a new pollDeleteDenial guard in worker.ts rejects deletes from anyone but the creator or facilitator (RBAC can't express "facilitator"). UI shows the delete chip to creator and facilitator.
+Verified: spec asserts the facilitator deleting a member's poll syncs to both windows; the deny path mirrors the already-adversarially-tested pollStatusDenial pattern (a 3rd non-creator account would be needed to raw-test it — noted, not faked).

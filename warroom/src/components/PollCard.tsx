@@ -147,14 +147,20 @@ export function PollCard({
               ? `YOU VOTED · ${total} VOTED`
               : `${total} VOTED`}
         </span>
-        <span className="flex items-center gap-3">
+        <span className="flex items-center gap-1.5">
           {canDelete && (
-            <button onClick={onDelete} className="wire text-ink-muted hover:text-ink">
+            <button
+              onClick={onDelete}
+              className="wire rounded-[2px] border border-ink/15 px-2 py-1 text-ink-muted hover:border-ink/40 hover:text-ink"
+            >
               DELETE
             </button>
           )}
           {!closed && isFacilitator && (
-            <button onClick={closePoll} className="wire text-signal hover:underline">
+            <button
+              onClick={closePoll}
+              className="wire rounded-[2px] border border-signal/40 px-2 py-1 text-signal hover:border-signal"
+            >
               CLOSE
             </button>
           )}

@@ -66,10 +66,13 @@ export function SummaryPanel({
 
   return (
     <div className="flex w-[26rem] flex-none flex-col overflow-y-auto bg-paper p-8 shadow-[-4px_0_12px_rgba(0,0,0,.4)]">
-      <div className="wire flex items-baseline justify-between text-[10px] text-ink-muted">
+      <div className="wire flex items-center justify-between text-[10px] text-ink-muted">
         <span>DISPATCH · {roomName.toUpperCase().slice(0, 24)}</span>
-        <button onClick={onClose} className="wire text-ink-muted hover:text-ink">
-          CLOSE
+        <button
+          onClick={onClose}
+          className="wire -mr-2 rounded-[2px] border border-ink/15 px-2.5 py-1.5 text-ink-muted hover:border-ink/40 hover:text-ink"
+        >
+          CLOSE ✕
         </button>
       </div>
       <div className="mt-4 font-serif text-4xl leading-none tracking-tight text-ink">

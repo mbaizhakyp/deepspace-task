@@ -107,15 +107,29 @@ async function importText(job: Job, ctx: JobContext, env: Env): Promise<unknown>
   if (ctx.signal.aborted) return { created: 0, canceled: true }
   if (cards.length === 0) throw new Error('the document produced no cards')
 
+  // B-011: a second import used to land on the same fixed grid as the first,
+  // stacking batches on top of each other. Start this batch's grid below
+  // everything already on the board.
+  const existing = await board.query<{ y?: number }>('cards', { limit: 500 })
+  const rows = existing.data?.records ?? []
+  const baseY = rows.length ? Math.max(...rows.map((r) => Number(r.data.y) || 0)) + 260 : 80
+  const bbox = { x0: Infinity, y0: Infinity, x1: -Infinity, y1: -Infinity }
+
   let created = 0
   for (let i = 0; i < cards.length; i++) {
     if (ctx.signal.aborted) break
     const card = cards[i]
+    const x = 60 + (i % 4) * 300
+    const y = baseY + Math.floor(i / 4) * 190
+    bbox.x0 = Math.min(bbox.x0, x)
+    bbox.y0 = Math.min(bbox.y0, y)
+    bbox.x1 = Math.max(bbox.x1, x + 280)
+    bbox.y1 = Math.max(bbox.y1, y + 190)
     await board.create('cards', {
       title: card.title.slice(0, 120),
       body: card.body.slice(0, 1200),
-      x: 60 + (i % 4) * 300,
-      y: 80 + Math.floor(i / 4) * 190,
+      x,
+      y,
       origin: 'imported',
       authorName: userName ?? '',
     })
@@ -131,7 +145,8 @@ async function importText(job: Job, ctx: JobContext, env: Env): Promise<unknown>
     text: `IMPORT LANDED · ${created} CARDS`,
   })
   ctx.progress(1, `DONE · ${created} CARDS`)
-  return { created }
+  // bbox lets clients center their camera on THIS batch, not all imports ever
+  return { created, bbox: created > 0 ? [bbox.x0, bbox.y0, bbox.x1, bbox.y1] : undefined }
 }
 
 /**

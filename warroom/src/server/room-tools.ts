@@ -35,6 +35,11 @@ export function roomTools(env: Env, roomId: string, asUserId: string) {
       exec('records.update', { collection, recordId, data }),
     get: <T extends Record<string, unknown>>(collection: string, recordId: string) =>
       exec<{ record: { recordId: string; data: T } }>('records.get', { collection, recordId }),
+    query: <T extends Record<string, unknown>>(collection: string, options?: Record<string, unknown>) =>
+      exec<{ records: Array<{ recordId: string; data: T }> }>('records.query', {
+        collection,
+        ...(options ?? {}),
+      }),
   }
 }
 

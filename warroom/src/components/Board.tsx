@@ -9,7 +9,7 @@ import { useEffect, useRef, useState } from 'react'
 import { getUserColor, useAuthUser, useJobs, useMutations, usePresenceRoom, useQuery } from 'deepspace'
 import { Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
-import { clampView, fitView, toWorld, zoomView, type View } from '../lib/camera'
+import { fitView, gridSpacing, toWorld, zoomView, type View } from '../lib/camera'
 import { PollCard, type PollData } from './PollCard'
 import { ImportPanel } from './ImportPanel'
 import { SummaryPanel } from './SummaryPanel'
@@ -26,9 +26,7 @@ export type CardData = {
 type SettingsData = { facilitatorId: string; frozenBy?: string | null; frozenByName?: string | null }
 type EventData = { at: number; text: string }
 
-// world (table) size — big enough to spread out; the camera makes it reachable
-const FIELD_W = 2400
-const FIELD_H = 1400
+// the canvas is unlimited (D-024) — RESET fits everything back into view
 
 export default function Board({
   roomId,
@@ -87,11 +85,11 @@ export default function Board({
       e.preventDefault()
       const rect = field.getBoundingClientRect()
       const v = viewRef.current
-      const next =
+      setView(
         e.ctrlKey || e.metaKey
           ? zoomView(v, e.clientX - rect.left, e.clientY - rect.top, Math.exp(-e.deltaY * 0.005))
-          : { ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }
-      setView(clampView(next, rect.width, rect.height, FIELD_W, FIELD_H))
+          : { ...v, x: v.x - e.deltaX, y: v.y - e.deltaY },
+      )
     }
     field.addEventListener('wheel', onWheel, { passive: false })
     return () => field.removeEventListener('wheel', onWheel)
@@ -100,9 +98,32 @@ export default function Board({
   function zoomBy(factor: number) {
     const rect = fieldRef.current?.getBoundingClientRect()
     if (!rect) return
-    setView((v) =>
-      clampView(zoomView(v, rect.width / 2, rect.height / 2, factor), rect.width, rect.height, FIELD_W, FIELD_H),
+    setView((v) => zoomView(v, rect.width / 2, rect.height / 2, factor))
+  }
+
+  // RESET = fit everything (cards AND polls) back into the window — the way
+  // home on an unlimited canvas.
+  function fitAll() {
+    const rect = fieldRef.current?.getBoundingClientRect()
+    if (!rect) return
+    const boxes = [
+      ...cards.map((c) => ({ x: c.data.x, y: c.data.y, w: 280, h: 200 })),
+      ...polls.map((p) => ({ x: p.data.x ?? 400, y: p.data.y ?? 200, w: 340, h: 280 })),
+    ]
+    setGlide(true)
+    setView(
+      boxes.length === 0
+        ? { x: 0, y: 0, scale: 1 }
+        : fitView(
+            Math.min(...boxes.map((b) => b.x)),
+            Math.min(...boxes.map((b) => b.y)),
+            Math.max(...boxes.map((b) => b.x + b.w)),
+            Math.max(...boxes.map((b) => b.y + b.h)),
+            rect.width,
+            rect.height,
+          ),
     )
+    setTimeout(() => setGlide(false), 750)
   }
 
   // When an import lands, glide everyone's camera to the new cards — unless
@@ -118,18 +139,25 @@ export default function Board({
     prevImportStatus.current = importJob?.status ?? null
     if (importJob?.status !== 'succeeded' || prev === null || prev === 'succeeded') return
     if (drag || pan.current) return
-    const imported = cards.filter((c) => c.data.origin === 'imported')
     const rect = fieldRef.current?.getBoundingClientRect()
-    if (imported.length === 0 || !rect) return
-    const xs = imported.map((c) => c.data.x)
-    const ys = imported.map((c) => c.data.y)
-    const target = fitView(
-      Math.min(...xs), Math.min(...ys),
-      Math.max(...xs) + 280, Math.max(...ys) + 190, // card width/height allowance
-      rect.width, rect.height,
-    )
+    if (!rect) return
+    // the job reports THIS batch's bounding box (B-011) so a second import
+    // centers on its own cards, not every import ever
+    const bbox = (importJob.result as { bbox?: number[] } | undefined)?.bbox
+    let target: View | null = null
+    if (bbox && bbox.length === 4) {
+      target = fitView(bbox[0], bbox[1], bbox[2], bbox[3], rect.width, rect.height)
+    } else {
+      const imported = cards.filter((c) => c.data.origin === 'imported')
+      if (imported.length > 0) {
+        const xs = imported.map((c) => c.data.x)
+        const ys = imported.map((c) => c.data.y)
+        target = fitView(Math.min(...xs), Math.min(...ys), Math.max(...xs) + 280, Math.max(...ys) + 190, rect.width, rect.height)
+      }
+    }
+    if (!target) return
     setGlide(true)
-    setView(clampView(target, rect.width, rect.height, FIELD_W, FIELD_H))
+    setView(target)
     setTimeout(() => setGlide(false), 750)
   }, [importJob?.status])
 
@@ -177,25 +205,14 @@ export default function Board({
     if (pan.current) {
       const { px, py } = pan.current
       pan.current = { px: e.clientX, py: e.clientY }
-      const rect = fieldRef.current?.getBoundingClientRect()
-      if (rect) {
-        setView((v) =>
-          clampView(
-            { ...v, x: v.x + e.clientX - px, y: v.y + e.clientY - py },
-            rect.width,
-            rect.height,
-            FIELD_W,
-            FIELD_H,
-          ),
-        )
-      }
+      setView((v) => ({ ...v, x: v.x + e.clientX - px, y: v.y + e.clientY - py }))
       return
     }
     if (!drag) return
     const p = fieldWorldPoint(e)
     if (!p) return
-    const x = clamp(p.wx - drag.dx, 0, FIELD_W - 40)
-    const y = clamp(p.wy - drag.dy, 0, FIELD_H - 40)
+    const x = p.wx - drag.dx
+    const y = p.wy - drag.dy
     setDrag({ ...drag, x, y })
     // stream position while dragging so other windows see the card move live
     const now = performance.now()
@@ -234,8 +251,8 @@ export default function Board({
     await create({
       title: '',
       body: '',
-      x: clamp(c.wx - 128 + (Math.random() - 0.5) * 120, 0, FIELD_W - 280),
-      y: clamp(c.wy - 60 + (Math.random() - 0.5) * 100, 0, FIELD_H - 160),
+      x: c.wx - 128 + (Math.random() - 0.5) * 120,
+      y: c.wy - 60 + (Math.random() - 0.5) * 100,
       origin: 'added',
       authorName: user?.fullName ?? '',
     })
@@ -298,10 +315,13 @@ export default function Board({
           <span className="h-1.5 w-1.5 rounded-full bg-live breathe" />
           <span className="wire text-chrome">{peers.length + 1} PRESENT</span>
         </div>
+        {/* room controls | board actions — glyphs differentiate at a glance
+            without breaking the wire voice (no emoji in chrome) */}
         <button
           onClick={copyInvite}
-          className="wire rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground"
+          className="wire flex items-center gap-1.5 rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground"
         >
+          <Glyph name="invite" />
           {invited ? 'LINK COPIED' : 'INVITE'}
         </button>
         {isFacilitator && (
@@ -309,34 +329,40 @@ export default function Board({
             onClick={toggleFreeze}
             className={
               frozen
-                ? 'wire rounded-sm bg-primary px-3 py-2 font-medium text-primary-foreground'
-                : 'wire rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground'
+                ? 'wire flex items-center gap-1.5 rounded-sm bg-primary px-3 py-2 font-medium text-primary-foreground'
+                : 'wire flex items-center gap-1.5 rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground'
             }
           >
+            <Glyph name="freeze" />
             {frozen ? 'UNFREEZE' : 'FREEZE'}
           </button>
         )}
+        <div className="mx-1 h-6 w-px bg-border" />
         <button
           onClick={() => setPanel(importOpen ? 'none' : 'import')}
           disabled={locked}
-          className={`wire rounded-sm border px-3 py-2 disabled:opacity-50 ${importOpen ? 'border-primary text-primary' : 'border-border text-chrome hover:border-chrome hover:text-foreground'}`}
+          className={`wire flex items-center gap-1.5 rounded-sm border px-3 py-2 disabled:opacity-50 ${importOpen ? 'border-primary text-primary' : 'border-border text-chrome hover:border-chrome hover:text-foreground'}`}
         >
+          <Glyph name="import" />
           IMPORT
         </button>
         <button
           onClick={() => setPollDialogOpen(true)}
           disabled={!pollMutations.ready || locked}
-          className="wire rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-50"
+          className="wire flex items-center gap-1.5 rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-50"
         >
+          <Glyph name="poll" />
           NEW POLL
         </button>
         <button
           onClick={addCard}
           disabled={!ready || locked}
-          className="wire rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-50"
+          className="wire flex items-center gap-1.5 rounded-sm border border-border px-3 py-2 text-chrome hover:border-chrome hover:text-foreground disabled:opacity-50"
         >
+          <Glyph name="card" />
           ADD CARD
         </button>
+        <div className="mx-1 h-6 w-px bg-border" />
         <button
           onClick={() => setPanel(panel === 'summary' ? 'none' : 'summary')}
           className="rounded-sm bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground"
@@ -349,12 +375,14 @@ export default function Board({
         <NewPollDialog
           onClose={() => setPollDialogOpen(false)}
           onCreate={async (question, options) => {
+            const rect = fieldRef.current?.getBoundingClientRect()
+            const c = rect ? toWorld(view, rect.width / 2, rect.height / 2) : { wx: 480, wy: 200 }
             await pollMutations.create({
               question,
               options,
               status: 'open',
-              x: 380 + Math.random() * 200,
-              y: 120 + Math.random() * 150,
+              x: c.wx - 160 + (Math.random() - 0.5) * 100,
+              y: c.wy - 120 + (Math.random() - 0.5) * 80,
               authorName: user?.fullName ?? '',
             })
             await eventMutations.create({ at: Date.now(), text: `POLL OPENED · ${question.toUpperCase().slice(0, 40)}` })
@@ -368,8 +396,14 @@ export default function Board({
       <div
         ref={fieldRef}
         // select-none: without it a pan drag runs a native text selection
-        // across every card it crosses (B-009)
-        className={`relative flex-1 touch-none select-none overflow-hidden bg-background ${frozen ? 'brightness-[.85]' : ''}`}
+        // across every card it crosses (B-009). The dot grid lives on the
+        // field itself (shifted/scaled with the camera) — the canvas is
+        // unlimited, so there is no world rect to paint it on.
+        className={`dotgrid relative flex-1 touch-none select-none overflow-hidden bg-background ${frozen ? 'brightness-[.85]' : ''}`}
+        style={{
+          backgroundSize: `${gridSpacing(view.scale)}px ${gridSpacing(view.scale)}px`,
+          backgroundPosition: `${view.x}px ${view.y}px`,
+        }}
         onPointerDown={(e) => {
           if (e.button !== 0) return
           pan.current = { px: e.clientX, py: e.clientY }
@@ -378,15 +412,13 @@ export default function Board({
         onPointerUp={endDrag}
         onPointerLeave={endDrag}
       >
-        {/* the table: everything in world coordinates lives inside */}
+        {/* everything in world coordinates lives inside this transform */}
         <div
-          className="dotgrid absolute left-0 top-0 rounded-sm border border-border/60"
+          className="absolute left-0 top-0"
           style={{
-            width: FIELD_W,
-            height: FIELD_H,
             transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
             transformOrigin: '0 0',
-            // only the import-landed glide animates; hand pans/zooms stay 1:1
+            // only the import-landed / fit-all glide animates; hand pans stay 1:1
             transition: glide ? 'transform 700ms cubic-bezier(0.25, 1, 0.35, 1)' : undefined,
           }}
         >
@@ -414,8 +446,8 @@ export default function Board({
             data={p.data}
             isFacilitator={isFacilitator}
             locked={locked}
-            // mirrors the server rule (polls delete: 'own')
-            canDelete={!locked && p.createdBy === user?.id}
+            // mirrors the server rule (pollDeleteDenial: creator or facilitator)
+            canDelete={!locked && (p.createdBy === user?.id || isFacilitator)}
             onDelete={() => void pollMutations.remove(p.recordId)}
             dragPos={overridePos(p.recordId)}
             onPointerDown={(e) =>
@@ -449,11 +481,9 @@ export default function Board({
           <button onClick={() => zoomBy(1 / 1.25)} className="rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" aria-label="Zoom out">−</button>
           <span className="w-10 text-center tabular-nums">{Math.round(view.scale * 100)}%</span>
           <button onClick={() => zoomBy(1.25)} className="rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" aria-label="Zoom in">+</button>
-          {(view.x !== 0 || view.y !== 0 || view.scale !== 1) && (
-            <button onClick={() => setView({ x: 0, y: 0, scale: 1 })} className="ml-1 hover:text-foreground">
-              RESET
-            </button>
-          )}
+          <button onClick={fitAll} className="ml-1 rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" title="Fit everything in view">
+            RESET
+          </button>
         </div>
 
         {/* wire log — the meeting writing its own record */}
@@ -493,6 +523,38 @@ export default function Board({
         </>
       )}
     </div>
+  )
+}
+
+/** 14px line glyphs for the toolbar — mono-weight strokes, chrome-colored. */
+function Glyph({ name }: { name: 'invite' | 'freeze' | 'import' | 'poll' | 'card' }) {
+  const paths: Record<string, React.ReactNode> = {
+    invite: (
+      <>
+        <circle cx="5" cy="4.5" r="2.2" />
+        <path d="M1.5 12c0-2.6 1.8-4.2 3.5-4.2S8.5 9.4 8.5 12" />
+        <path d="M11.5 3.5v4M9.5 5.5h4" />
+      </>
+    ),
+    freeze: <path d="M7 1.5v11M2.2 4.25l9.6 5.5M11.8 4.25l-9.6 5.5" />,
+    import: (
+      <>
+        <path d="M7 1.5V8M4.5 5.5L7 8l2.5-2.5" />
+        <path d="M1.5 9.5v2a1 1 0 001 1h9a1 1 0 001-1v-2" />
+      </>
+    ),
+    poll: <path d="M2.5 12.5v-5M7 12.5v-9M11.5 12.5v-3" />,
+    card: (
+      <>
+        <rect x="1.75" y="1.75" width="10.5" height="10.5" rx="1" />
+        <path d="M7 4.75v4.5M4.75 7h4.5" />
+      </>
+    ),
+  }
+  return (
+    <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="1.3" strokeLinecap="round" aria-hidden>
+      {paths[name]}
+    </svg>
   )
 }
 
@@ -580,7 +642,7 @@ function BoardCard({
       {canDelete && !editing && (
         <button
           onClick={onDelete}
-          className="absolute right-1.5 top-1 hidden text-ink-muted hover:text-ink [div:hover>&]:block"
+          className="absolute right-0.5 top-0.5 hidden p-1.5 text-base leading-none text-ink-muted hover:text-ink [div:hover>&]:block"
           aria-label="Delete card"
         >
           ×
@@ -641,10 +703,6 @@ function NewPollDialog({
       </div>
     </div>
   )
-}
-
-function clamp(v: number, lo: number, hi: number) {
-  return Math.min(Math.max(v, lo), hi)
 }
 
 /** Deterministic tiny rotation per card — paper on a table, stable across renders. */

@@ -168,8 +168,11 @@ export function ImportPanel({ roomId, onClose }: { roomId: string; onClose: () =
     <div className="flex w-96 flex-none flex-col border-l border-border bg-card p-6">
       <div className="flex items-baseline justify-between">
         <div className="wire text-chrome">IMPORT A DOCUMENT</div>
-        <button onClick={onClose} className="wire text-chrome hover:text-foreground">
-          CLOSE
+        <button
+          onClick={onClose}
+          className="wire -mr-1 rounded-sm border border-border px-2.5 py-1.5 text-chrome hover:border-chrome hover:text-foreground"
+        >
+          CLOSE ✕
         </button>
       </div>
 

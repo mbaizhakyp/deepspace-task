@@ -126,4 +126,10 @@ test('war room: live sync, one-vote polls, server-enforced freeze', async ({ use
     return hook.polls[0]?.status
   })
   expect(pollStatusSeenByA).toBe('closed')
+
+  // ── facilitator may delete a poll they didn't create (schema delete:true
+  // narrowed by pollDeleteDenial to creator-or-facilitator) ─────────────
+  await a.page.getByRole('button', { name: 'DELETE', exact: true }).click()
+  await expect(a.page.getByText(/RESULT ·/)).toHaveCount(0, { timeout: 10_000 })
+  await expect(b.page.getByText(/RESULT ·/)).toHaveCount(0, { timeout: 10_000 })
 })

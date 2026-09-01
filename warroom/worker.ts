@@ -79,7 +79,8 @@ export class AppRecordRoom extends RecordRoom<Env> {
           const denial =
             this.freezeDenial(ws) ??
             this.closedPollVoteDenial(msg.payload) ??
-            this.pollStatusDenial(ws, msg.payload)
+            this.pollStatusDenial(ws, msg.payload) ??
+            (msg.type === MSG.DELETE ? this.pollDeleteDenial(ws, msg.payload) : null)
           if (denial) {
             const requestId = msg.payload?.requestId
             if (requestId) {
@@ -154,6 +155,33 @@ export class AppRecordRoom extends RecordRoom<Env> {
       }
       if (polls[0]._created_by === sender) return null // creator may close their open poll
       return 'permission denied: only the poll creator or facilitator can close it'
+    } catch {
+      return null
+    }
+  }
+
+  /**
+   * Poll deletion: creator or facilitator only. The schema grants members
+   * `delete: true` (RBAC can't say "facilitator"); this guard narrows it.
+   */
+  private pollDeleteDenial(
+    ws: WebSocket,
+    payload?: { collection?: string; recordId?: string },
+  ): string | null {
+    if (payload?.collection !== 'polls' || !payload.recordId) return null
+    try {
+      const attachment = ws.deserializeAttachment() as { userId?: string } | null
+      const sender = attachment?.userId
+      if (!sender) return 'permission denied: sign in to delete polls'
+      const settings = this.sql
+        .exec(`SELECT col_facilitatorid FROM c_board_settings WHERE _row_id = 'settings'`)
+        .toArray() as Array<{ col_facilitatorid: string | null }>
+      if (settings[0]?.col_facilitatorid === sender) return null
+      const polls = this.sql
+        .exec(`SELECT _created_by FROM c_polls WHERE _row_id = ?`, payload.recordId)
+        .toArray() as Array<{ _created_by: string | null }>
+      if (!polls[0] || polls[0]._created_by === sender) return null
+      return 'permission denied: only the poll creator or facilitator can delete it'
     } catch {
       return null
     }
