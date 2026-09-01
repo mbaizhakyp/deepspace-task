@@ -87,6 +87,28 @@ describe('extractDocList (picker: doc listings in unknown nesting)', () => {
   })
 })
 
+describe('board camera (pan/zoom math, D-022)', () => {
+  it('zoomView keeps the world point under the pointer fixed', async () => {
+    const { zoomView, toWorld } = await import('./lib/camera')
+    const v = { x: -120, y: 40, scale: 1 }
+    const before = toWorld(v, 500, 300)
+    const after = toWorld(zoomView(v, 500, 300, 0.5), 500, 300)
+    expect(after.wx).toBeCloseTo(before.wx)
+    expect(after.wy).toBeCloseTo(before.wy)
+  })
+  it('zoomView clamps scale to its bounds', async () => {
+    const { zoomView, MIN_SCALE, MAX_SCALE } = await import('./lib/camera')
+    expect(zoomView({ x: 0, y: 0, scale: 1 }, 0, 0, 0.01).scale).toBe(MIN_SCALE)
+    expect(zoomView({ x: 0, y: 0, scale: 1 }, 0, 0, 100).scale).toBe(MAX_SCALE)
+  })
+  it('clampView never lets the board leave the viewport entirely', async () => {
+    const { clampView } = await import('./lib/camera')
+    const lost = clampView({ x: -99999, y: 99999, scale: 1 }, 1200, 800, 2400, 1400)
+    expect(lost.x).toBe(160 - 2400) // right edge of world still 160px on-screen
+    expect(lost.y).toBe(800 - 160) // top edge of world still 160px on-screen
+  })
+})
+
 describe('parseMemberIds (stored membership json)', () => {
   it('accepts arrays and JSON strings', () => {
     expect(parseMemberIds(['a', 'b'])).toEqual(['a', 'b'])

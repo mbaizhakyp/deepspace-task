@@ -5,10 +5,11 @@
  * the UI here only mirrors it.
  */
 
-import { useRef, useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { getUserColor, useAuthUser, useMutations, usePresenceRoom, useQuery } from 'deepspace'
 import { Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
+import { clampView, toWorld, zoomView, type View } from '../lib/camera'
 import { PollCard, type PollData } from './PollCard'
 import { ImportPanel } from './ImportPanel'
 import { SummaryPanel } from './SummaryPanel'
@@ -25,8 +26,9 @@ export type CardData = {
 type SettingsData = { facilitatorId: string; frozenBy?: string | null; frozenByName?: string | null }
 type EventData = { at: number; text: string }
 
-const FIELD_W = 1600
-const FIELD_H = 900
+// world (table) size — big enough to spread out; the camera makes it reachable
+const FIELD_W = 2400
+const FIELD_H = 1400
 
 export default function Board({
   roomId,
@@ -70,13 +72,53 @@ export default function Board({
   const fieldRef = useRef<HTMLDivElement>(null)
   const lastCursorSent = useRef(0)
 
+  // ── camera (D-022): local per-user pan/zoom; records keep world coords ──
+  const [view, setView] = useState<View>({ x: 0, y: 0, scale: 1 })
+  const viewRef = useRef(view)
+  viewRef.current = view
+  const pan = useRef<{ px: number; py: number } | null>(null)
+
+  // wheel = pan, ctrl/cmd+wheel (trackpad pinch) = zoom at the pointer.
+  // Native listener: React's onWheel can't preventDefault (passive).
+  useEffect(() => {
+    const field = fieldRef.current
+    if (!field) return
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault()
+      const rect = field.getBoundingClientRect()
+      const v = viewRef.current
+      const next =
+        e.ctrlKey || e.metaKey
+          ? zoomView(v, e.clientX - rect.left, e.clientY - rect.top, Math.exp(-e.deltaY * 0.005))
+          : { ...v, x: v.x - e.deltaX, y: v.y - e.deltaY }
+      setView(clampView(next, rect.width, rect.height, FIELD_W, FIELD_H))
+    }
+    field.addEventListener('wheel', onWheel, { passive: false })
+    return () => field.removeEventListener('wheel', onWheel)
+  }, [])
+
+  function zoomBy(factor: number) {
+    const rect = fieldRef.current?.getBoundingClientRect()
+    if (!rect) return
+    setView((v) =>
+      clampView(zoomView(v, rect.width / 2, rect.height / 2, factor), rect.width, rect.height, FIELD_W, FIELD_H),
+    )
+  }
+
+  function fieldWorldPoint(e: React.PointerEvent): { wx: number; wy: number } | null {
+    const rect = fieldRef.current?.getBoundingClientRect()
+    if (!rect) return null
+    return toWorld(viewRef.current, e.clientX - rect.left, e.clientY - rect.top)
+  }
+
   function onFieldPointerMove(e: React.PointerEvent) {
     const now = performance.now()
     if (now - lastCursorSent.current < 60) return
     lastCursorSent.current = now
-    const rect = fieldRef.current?.getBoundingClientRect()
-    if (!rect) return
-    updateState({ cx: e.clientX - rect.left, cy: e.clientY - rect.top, name: user?.fullName ?? '?' })
+    const p = fieldWorldPoint(e)
+    // world coords: peers render your cursor glued to the cards, whatever
+    // their own camera is doing
+    if (p) updateState({ cx: p.wx, cy: p.wy, name: user?.fullName ?? '?' })
   }
 
   // ── drag (cards and polls share it; kind picks the collection) ──────
@@ -85,15 +127,16 @@ export default function Board({
   const lastDragSync = useRef(0)
 
   function startDrag(e: React.PointerEvent, id: string, kind: 'card' | 'poll', x: number, y: number) {
+    e.stopPropagation() // grabbing a card must not also pan the board
     if (locked) {
       setShakeId(id)
       setTimeout(() => setShakeId(null), 350)
       warning('Board is frozen', `${settings?.frozenByName ?? 'The facilitator'} froze the board`)
       return
     }
-    const rect = fieldRef.current?.getBoundingClientRect()
-    if (!rect) return
-    setDrag({ id, kind, dx: e.clientX - rect.left - x, dy: e.clientY - rect.top - y, x, y })
+    const p = fieldWorldPoint(e)
+    if (!p) return
+    setDrag({ id, kind, dx: p.wx - x, dy: p.wy - y, x, y })
   }
 
   function syncDragPosition(id: string, kind: 'card' | 'poll', x: number, y: number) {
@@ -103,11 +146,28 @@ export default function Board({
 
   function onDragMove(e: React.PointerEvent) {
     onFieldPointerMove(e)
+    if (pan.current) {
+      const { px, py } = pan.current
+      pan.current = { px: e.clientX, py: e.clientY }
+      const rect = fieldRef.current?.getBoundingClientRect()
+      if (rect) {
+        setView((v) =>
+          clampView(
+            { ...v, x: v.x + e.clientX - px, y: v.y + e.clientY - py },
+            rect.width,
+            rect.height,
+            FIELD_W,
+            FIELD_H,
+          ),
+        )
+      }
+      return
+    }
     if (!drag) return
-    const rect = fieldRef.current?.getBoundingClientRect()
-    if (!rect) return
-    const x = clamp(e.clientX - rect.left - drag.dx, 0, FIELD_W - 40)
-    const y = clamp(e.clientY - rect.top - drag.dy, 0, FIELD_H - 40)
+    const p = fieldWorldPoint(e)
+    if (!p) return
+    const x = clamp(p.wx - drag.dx, 0, FIELD_W - 40)
+    const y = clamp(p.wy - drag.dy, 0, FIELD_H - 40)
     setDrag({ ...drag, x, y })
     // stream position while dragging so other windows see the card move live
     const now = performance.now()
@@ -123,6 +183,7 @@ export default function Board({
   const [settled, setSettled] = useState<{ id: string; x: number; y: number } | null>(null)
 
   function endDrag() {
+    pan.current = null
     if (drag) {
       syncDragPosition(drag.id, drag.kind, drag.x, drag.y)
       setSettled({ id: drag.id, x: drag.x, y: drag.y })
@@ -139,11 +200,14 @@ export default function Board({
 
   // ── card CRUD ───────────────────────────────────────────────────────
   async function addCard() {
+    // land the new card in the middle of wherever this user is looking
+    const rect = fieldRef.current?.getBoundingClientRect()
+    const c = rect ? toWorld(view, rect.width / 2, rect.height / 2) : { wx: 300, wy: 250 }
     await create({
       title: '',
       body: '',
-      x: 80 + Math.random() * 300,
-      y: 100 + Math.random() * 200,
+      x: clamp(c.wx - 128 + (Math.random() - 0.5) * 120, 0, FIELD_W - 280),
+      y: clamp(c.wy - 60 + (Math.random() - 0.5) * 100, 0, FIELD_H - 160),
       origin: 'added',
       authorName: user?.fullName ?? '',
     })
@@ -275,11 +339,27 @@ export default function Board({
       <div className="flex min-h-0 flex-1">
       <div
         ref={fieldRef}
-        className={`dotgrid relative flex-1 overflow-auto ${frozen ? 'brightness-[.85]' : ''}`}
+        // select-none: without it a pan drag runs a native text selection
+        // across every card it crosses (B-009)
+        className={`relative flex-1 touch-none select-none overflow-hidden bg-background ${frozen ? 'brightness-[.85]' : ''}`}
+        onPointerDown={(e) => {
+          if (e.button !== 0) return
+          pan.current = { px: e.clientX, py: e.clientY }
+        }}
         onPointerMove={onDragMove}
         onPointerUp={endDrag}
         onPointerLeave={endDrag}
       >
+        {/* the table: everything in world coordinates lives inside */}
+        <div
+          className="dotgrid absolute left-0 top-0 rounded-sm border border-border/60"
+          style={{
+            width: FIELD_W,
+            height: FIELD_H,
+            transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+            transformOrigin: '0 0',
+          }}
+        >
         {cards.map((c) => (
           <BoardCard
             key={c.recordId}
@@ -332,6 +412,19 @@ export default function Board({
             </div>
           )
         })}
+        </div>
+
+        {/* camera HUD — screen-fixed, like the wire log */}
+        <div className="wire absolute bottom-4 right-5 z-30 flex items-center gap-2 text-chrome">
+          <button onClick={() => zoomBy(1 / 1.25)} className="rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" aria-label="Zoom out">−</button>
+          <span className="w-10 text-center tabular-nums">{Math.round(view.scale * 100)}%</span>
+          <button onClick={() => zoomBy(1.25)} className="rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" aria-label="Zoom in">+</button>
+          {(view.x !== 0 || view.y !== 0 || view.scale !== 1) && (
+            <button onClick={() => setView({ x: 0, y: 0, scale: 1 })} className="ml-1 hover:text-foreground">
+              RESET
+            </button>
+          )}
+        </div>
 
         {/* wire log — the meeting writing its own record */}
         <div className="pointer-events-none absolute bottom-4 left-5 z-30 flex flex-col gap-1">

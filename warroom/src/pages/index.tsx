@@ -51,6 +51,18 @@ export default function Landing() {
             <span className="text-primary">→</span>
             <span>EXPORT</span>
           </div>
+          <div className="wire mt-5 grid grid-cols-2 gap-x-10 gap-y-1.5 text-left text-[10px] text-chrome/70">
+            {[
+              'LIVE CARDS & CURSORS',
+              'GOOGLE DOCS IMPORT',
+              'ONE-VOTE POLLS',
+              'FACILITATOR FREEZE',
+              'AI DISPATCH SUMMARY',
+              'INVITE BY LINK',
+            ].map((f) => (
+              <span key={f}>· {f}</span>
+            ))}
+          </div>
           <Link
             to="/rooms"
             className="mt-10 rounded-sm bg-primary px-6 py-3 text-sm font-semibold text-primary-foreground hover:brightness-110"

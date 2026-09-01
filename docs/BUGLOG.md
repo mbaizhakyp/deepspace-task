@@ -201,3 +201,15 @@ When: post-submission polish (user asked about Higgsfield for the landing)
 Decision: elevate the landing with the brief's missing "live-looking product shot of the Room" (design-brief §6.6) — a CSS miniature board that assembles itself (staggered card-drop, live poll fillbars, breathing presence, cycling wire log) built from the app's own animation utilities. Declined AI-generated (Higgsfield) hero imagery.
 Why: the identity is typographic restraint; the strongest hook for a tool is the tool. Zero new dependencies/assets — every animation class already existed for the real board.
 Beats: a generated cinematic hero — the one element that would make a distinctive page read generic, plus an asset pipeline outside my hands (needs the user's Higgsfield account).
+
+## D-022 · Board camera: local pan/zoom, world coords in records
+When: post-submission polish (friend feedback: "zoom out and drag it to one side, like infinite canvas")
+Decision: the board gets a per-user camera — drag empty ground to pan, wheel pans, ctrl/pinch zooms at the pointer, mono HUD (−/%/+/RESET) bottom-right. View is LOCAL state; records keep world coordinates, so two people can frame the board differently while dragging the same cards. Presence cursors now sync in world coords (glued to cards under any camera). World grew to 2400×1400; pan clamps so ≥160px of the table stays on-screen (can't get lost). Math lives in pure `src/lib/camera.ts` with unit tests (zoom-at-pointer invariant, clamp bounds).
+Why: fixed viewport meant a busy import could push cards out of reach; camera transform (one wrapper div) is the platform-primitive answer.
+Beats: truly infinite canvas (unbounded coords complicate clamping, import placement, and "where is everyone" for zero demo value) and synced viewports (fighting over one camera).
+
+## B-009 · Pan drag runs a native text selection across cards · FIXED
+When: D-022 verification (prod screenshot showed card meta text highlighted after a pan)
+Symptom: dragging the board ground to pan left orange selection highlights on card text the pointer crossed.
+Root cause: pointer-event panning doesn't suppress the browser's native drag-to-select.
+Fix: `select-none` on the board field. · Verified: re-ran the prod pan script; screenshot clean.

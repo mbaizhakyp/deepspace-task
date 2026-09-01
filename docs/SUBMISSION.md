@@ -7,7 +7,7 @@ Sixty-second demo: sign in → open a room → IMPORT → paste any text (messy 
 
 ## What it is
 
-A war room, not a call. Import a document — tidy or messy — and it lands on a shared board as live cards. The team triages together (presence cursors, realtime drag), contested points get settled by live polls (one vote per person, enforced by the database), the facilitator can freeze the whole room server-side, and the meeting ends with an AI-written dispatch ("What was decided") exported as Markdown. The meeting is the artifact.
+A war room, not a call. Import a document — tidy or messy — and it lands on a shared board as live cards. The team triages together (presence cursors, realtime drag, a pannable/zoomable board that each person frames for themselves), contested points get settled by live polls (one vote per person, enforced by the database), the facilitator can freeze the whole room server-side, and the meeting ends with an AI-written dispatch ("What was decided") exported as Markdown. The meeting is the artifact.
 
 Best demo: open the room in two browser windows as two users. Vote in one, watch the bar move in the other; freeze in one, watch the other lock.
 
