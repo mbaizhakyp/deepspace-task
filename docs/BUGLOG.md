@@ -295,3 +295,8 @@ Decision: EXPORT .MD in the camera HUD downloads the whole table — every card 
 ## D-034 · Nav: bigger, and absent inside a room
 When: user feedback round 4
 Decision: nav grows to h-16 with the serif wordmark at display size; inside /room/* it doesn't render at all — the board is the screen (the brief's rule), and the room header's ← LOBBY is the way out. Day theme got a contrast pass in the same round (ground dropped two stops below paper, hairlines and chrome text deepened) after "light theme is mostly white" feedback.
+
+## D-035 · Payments complete: Stripe Connect onboarded, checkout verified live
+When: user completed Connect onboarding at /earnings (their Stripe identity — flagged as user-only work)
+Verified: redeploy shows "Synced 1 plan to Stripe" with no owner_connect_not_ready warning; a prod probe as a test account clicked Go Pro and landed on checkout.stripe.com (session created, purchase deliberately NOT completed — no card entered). The free-tier gate (3 imports/room, forged-enqueue-proof) was already adversarially verified; entitlement lifts it via isProEntitled at job execution.
+SUBMISSION.md's known-limitation line removed — the limitation no longer exists.

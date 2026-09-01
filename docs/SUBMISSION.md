@@ -23,7 +23,7 @@ Best demo: open the room in two browser windows as two users. Vote in one, watch
 4. **Presence** — live named cursors + roster.
 5. **Background jobs** — imports run in the platform JobRoom; progress streams to every room member over WS while cards land one by one.
 6. **AI integration** — segmentation (by idea, not headings — messy docs work) and the summary dispatch, via the platform's Anthropic integration; developer-billed, rate-limited.
-7. **Payments** — Pro plan synced to Stripe; free tier = 3 imports/room enforced server-side (a forged client enqueue still hits the quota in the job handler). Checkout is live pending Stripe Connect onboarding.
+7. **Payments** — Pro plan synced to Stripe; free tier = 3 imports/room enforced server-side (a forged client enqueue still hits the quota in the job handler). Checkout is fully live: Stripe Connect onboarding is complete and "Go Pro" reaches checkout.stripe.com (verified against prod).
 
 Plus **Composio per-user OAuth** for Google Docs import (paste a doc URL, approve access, import as yourself) — code-complete with the `requiresConnection` dance; the live OAuth round-trip is the one path not yet verified end-to-end (needs a real Google consent).
 
@@ -52,6 +52,5 @@ Full history: `docs/BUGLOG.md` (B-001…B-006, D-001…D-016). Final state: 10 u
 ## Honest edges / what I'd do next
 
 - **Google Docs OAuth**: implemented, not live-verified (Composio tool slugs flagged for runtime check, B-002). Next session: one consent click + slug verification.
-- **Stripe Connect onboarding** not completed, so checkout returns the platform's `owner_connect_not_ready` — the server-side gate is enforced regardless.
 - Next features, in order: source-panel "highlight → extract to card" for messy docs; export the dispatch back to a new Google Doc over the same Composio connection; AI chat grounded in the imported doc.
 - Known ceilings are marked with `ponytail:` comments in code (e.g., per-mutation freeze SQL read; per-room rather than per-user import quota).
