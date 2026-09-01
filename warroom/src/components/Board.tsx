@@ -11,7 +11,7 @@ import { getUserColor, useAuthUser, useJobs, useMutations, usePresenceRoom, useQ
 import { Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
 import { fitView, gridSpacing, toWorld, zoomView, type View } from '../lib/camera'
-import { PollCard, type PollData } from './PollCard'
+import { parseOptions, PollCard, type PollData, type VoteData } from './PollCard'
 import { ImportPanel } from './ImportPanel'
 import { SummaryPanel } from './SummaryPanel'
 import type { Summary } from '../actions/summarize'
@@ -47,6 +47,7 @@ export default function Board({
   const { records: settingsRecords } = useQuery<SettingsData>('board_settings', {})
   const { records: events } = useQuery<EventData>('events', { orderBy: 'at', orderDir: 'desc', limit: 5 })
   const { records: polls } = useQuery<PollData>('polls', {})
+  const { records: allVotes } = useQuery<VoteData>('votes', {})
   const { create, put, remove, ready } = useMutations<CardData>('cards')
   const pollMutations = useMutations<PollData>('polls')
   const voteMutations = useMutations<{ pollId: string; voterId: string; optionIndex: number }>('votes')
@@ -302,6 +303,39 @@ export default function Board({
     else warning(isFacilitator ? 'Could not delete the room' : 'Could not leave', res.error)
   }
 
+  // ── board export: the whole table as Markdown (cards, polls, tallies) ──
+  function exportBoard() {
+    const lines = [
+      `# ${roomName} — board export`,
+      '',
+      `Exported ${new Date().toLocaleString()} · ${cards.length} cards · ${polls.length} polls`,
+      '',
+      '## Cards',
+      '',
+      ...cards.map((c) => {
+        const meta = `${c.data.origin === 'imported' ? 'imported' : 'added'}${c.data.authorName ? ` · ${c.data.authorName}` : ''}`
+        return `- **${c.data.title || 'Untitled'}** — ${c.data.body || '(empty)'} _(${meta})_`
+      }),
+      '',
+      '## Polls',
+      '',
+      ...(polls.length === 0 ? ['(none)'] : []),
+      ...polls.map((p) => {
+        const opts = parseOptions(p.data.options)
+        const votes = allVotes.filter((v) => v.data.pollId === p.recordId)
+        const tally = opts
+          .map((o, i) => `${o} ${votes.filter((v) => v.data.optionIndex === i).length}`)
+          .join(' · ')
+        return `- **${p.data.question}** (${p.data.status === 'closed' ? 'decided' : 'live'}) — ${tally}`
+      }),
+    ]
+    const a = document.createElement('a')
+    a.href = URL.createObjectURL(new Blob([lines.join('\n')], { type: 'text/markdown' }))
+    a.download = `${roomName.toLowerCase().replace(/[^a-z0-9]+/g, '-')}-board.md`
+    a.click()
+    URL.revokeObjectURL(a.href)
+  }
+
   async function toggleFreeze() {
     const res = await callAction('set-freeze', {
       roomId,
@@ -510,11 +544,19 @@ export default function Board({
 
         {/* camera HUD — screen-fixed, like the wire log */}
         <div className="wire absolute bottom-4 right-5 z-30 flex items-center gap-2 text-chrome">
+          <button onClick={exportBoard} className="mr-1 rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" title="Download the board as Markdown">
+            EXPORT .MD
+          </button>
           <button onClick={() => zoomBy(1 / 1.25)} className="rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" aria-label="Zoom out">−</button>
           <span className="w-10 text-center tabular-nums">{Math.round(view.scale * 100)}%</span>
           <button onClick={() => zoomBy(1.25)} className="rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" aria-label="Zoom in">+</button>
-          <button onClick={fitAll} className="ml-1 rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" title="Fit everything in view">
-            RESET
+          {/* "RESET" read as "wipe the board" — it frames, so say so (D-032) */}
+          <button onClick={fitAll} className="ml-1 flex items-center gap-1.5 rounded-sm border border-border px-2 py-1 hover:border-chrome hover:text-foreground" title="Bring every card and poll into view">
+            <svg width="11" height="11" viewBox="0 0 12 12" fill="none" stroke="currentColor" strokeWidth="1.2" strokeLinecap="round" aria-hidden>
+              <path d="M1 3.5V1h2.5M8.5 1H11v2.5M11 8.5V11H8.5M3.5 11H1V8.5" />
+              <circle cx="6" cy="6" r="1" fill="currentColor" stroke="none" />
+            </svg>
+            FIT ALL
           </button>
         </div>
 

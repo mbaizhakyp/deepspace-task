@@ -254,21 +254,23 @@
    ink, orange) are identical in both editions. Toggled from the nav, stored
    in localStorage, first-paint handled in index.html. ── */
 [data-theme="day"] {
-  --color-background: #e7e3d8;
+  /* contrast pass (round 4): ground sits two stops below the paper so cards
+     and panels actually read as raised; hairlines and chrome text deepen */
+  --color-background: #d8d2bf;
   --color-foreground: #1a1a16;
-  --color-card: #f0ece1;
+  --color-card: #f2eee3;
   --color-card-foreground: #1a1a16;
-  --color-popover: #f0ece1;
+  --color-popover: #f2eee3;
   --color-popover-foreground: #1a1a16;
-  --color-secondary: #f0ece1;
+  --color-secondary: #f2eee3;
   --color-secondary-foreground: #1a1a16;
-  --color-muted: #dcd7c9;
-  --color-muted-foreground: #6e6a5e;
-  --color-accent: #dcd7c9;
+  --color-muted: #c8c2ad;
+  --color-muted-foreground: #55524a;
+  --color-accent: #c8c2ad;
   --color-accent-foreground: #1a1a16;
-  --color-border: #c9c4b2;
-  --color-input: #c9c4b2;
-  --color-chrome: #6e6a5e;
+  --color-border: #a9a28b;
+  --color-input: #a9a28b;
+  --color-chrome: #55524a;
   --color-live: #15803d; /* phosphor green fails on newsprint; forest reads */
   color-scheme: light;
 }

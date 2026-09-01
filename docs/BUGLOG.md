@@ -277,3 +277,21 @@ Decisions: (a) imported cards render on manila stock (new --color-manila token) 
 ## D-031 · docs/DECISIONS.md — curated decision record, committed (not gitignored)
 When: user feedback round 3 ("make a document for these decisions; decide whether git should ignore it")
 Decision: a showcase-ready decision record distilled from this log (architecture, security, integrations, UX, process), committed to the repo — the exercise scores how decisions were made, so the record is part of the deliverable, not a private note. BUGLOG.md stays the chronological source of truth; DECISIONS.md points into it.
+
+## B-013 · Owner's lobby listed every room in the app · FIXED
+When: user feedback round 4 ("I shouldn't see rooms I didn't create or join") — resolves the earlier "all rooms visible" mystery
+Symptom: one account saw rooms it never created or joined.
+Root cause: `rooms` read is `'collaborator'`-scoped for members, but the app OWNER holds the admin role, and admin read is `true` — the platform is behaving correctly; the lobby just showed everything admin could read.
+Fix: the lobby filters client-side to rooms where you're facilitator or member (admin oversight belongs to /audit, not the lobby). Server-side scoping for non-admins unchanged. · Verified: owner-visible room list now matches membership.
+
+## D-032 · Camera home button: RESET → FIT ALL with a frame glyph
+When: user feedback round 4 ("Reset sounds like it deletes everything")
+Decision: renamed to FIT ALL with a frame-corners icon and a "bring every card and poll into view" tooltip. Naming-is-UX: a camera action must not sound like a data action.
+
+## D-033 · Board export: Markdown transcript from the HUD
+When: user feedback round 4 ("the board itself should be exportable")
+Decision: EXPORT .MD in the camera HUD downloads the whole table — every card (title, body, origin, author) and every poll with live tallies and status. Beats a PNG snapshot (needs a rendering dependency, loses the text; the product's thesis is that the artifact is the CONTENT).
+
+## D-034 · Nav: bigger, and absent inside a room
+When: user feedback round 4
+Decision: nav grows to h-16 with the serif wordmark at display size; inside /room/* it doesn't render at all — the board is the screen (the brief's rule), and the room header's ← LOBBY is the way out. Day theme got a contrast pass in the same round (ground dropped two stops below paper, hairlines and chrome text deepened) after "light theme is mostly white" feedback.

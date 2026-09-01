@@ -9,6 +9,7 @@ import { useNavigate } from 'react-router-dom'
 import { useAuthUser, useQuery, useUsers } from 'deepspace'
 import { Button, Input, useToast } from '@/components/ui'
 import { callAction } from '../../../lib/actions-client'
+import { parseMemberIds } from '../../../actions/rooms'
 
 type Room = { name: string; facilitatorId: string; memberIds?: unknown }
 
@@ -23,7 +24,15 @@ export function parseRoomCode(input: string): string | null {
 
 export default function RoomsPage() {
   const { user } = useAuthUser()
-  const { records: rooms, status } = useQuery<Room>('rooms', { orderBy: 'createdAt', orderDir: 'desc' })
+  const { records: allRooms, status } = useQuery<Room>('rooms', { orderBy: 'createdAt', orderDir: 'desc' })
+  // `read: 'collaborator'` scopes this server-side for members — but the app
+  // OWNER's admin role legitimately reads every room, which made the owner's
+  // lobby list everyone's rooms. The lobby is "your rooms", so filter here
+  // too; admin oversight lives in /audit, not the lobby.
+  const rooms = allRooms.filter(
+    (r) =>
+      r.data.facilitatorId === user?.id || parseMemberIds(r.data.memberIds).includes(user?.id ?? ''),
+  )
   // roster (public identity) — lets rows say WHOSE room it is; two rooms may
   // legitimately share a name (B-005), so name alone must never be the label
   const { users: roster } = useUsers()

@@ -119,7 +119,7 @@ export default function Navigation() {
         to={item.path}
         aria-current={active ? 'page' : undefined}
         className={cn(
-          'wire border-b px-3 py-1.5',
+          'wire border-b px-3.5 py-2.5',
           active
             ? 'border-primary text-foreground'
             : 'border-transparent text-chrome hover:text-foreground',
@@ -133,15 +133,15 @@ export default function Navigation() {
   return (
     <>
       <nav data-testid="app-navigation" className="border-b border-border bg-background">
-        <div className="mx-auto flex h-12 max-w-7xl items-center gap-4 px-4">
-          <Link to="/home" className="flex items-baseline gap-2">
-            <span className="font-serif text-xl tracking-tight text-foreground">{APP_NAME}</span>
+        <div className="mx-auto flex h-16 max-w-7xl items-center gap-4 px-5">
+          <Link to="/home" className="flex items-baseline gap-2.5">
+            <span className="font-serif text-3xl tracking-tight text-foreground">{APP_NAME}</span>
             <span className="wire hidden text-[9px] text-chrome/60 sm:inline">
               THE MEETING IS THE ARTIFACT
             </span>
           </Link>
 
-          <div className="mx-1 hidden h-5 w-px bg-border md:block" />
+          <div className="mx-1 hidden h-6 w-px bg-border md:block" />
           <div className="hidden items-center md:flex">{visibleNav.map(navLink)}</div>
 
           <div className="flex-1" />

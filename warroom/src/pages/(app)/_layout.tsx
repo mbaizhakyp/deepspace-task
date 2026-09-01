@@ -16,7 +16,7 @@
  */
 
 import { Suspense, type ReactNode } from 'react'
-import { Outlet } from 'react-router-dom'
+import { Outlet, useLocation } from 'react-router-dom'
 import { DeepSpaceAuthProvider, useAuthStatus } from 'deepspace'
 import { RecordProvider, RecordScope } from 'deepspace'
 import Navigation from '../../components/Navigation'
@@ -25,11 +25,14 @@ import { SCOPE_ID } from '../../constants'
 import { schemas } from '../../schemas'
 
 export default function AppLayout() {
+  // Inside a room the board IS the screen (design brief: no chrome around the
+  // room) — the room header carries ← LOBBY, so the nav bar stands down.
+  const inRoom = useLocation().pathname.startsWith('/room/')
   return (
     <DeepSpaceAuthProvider>
       <AuthBoot>
         <div className="flex h-screen flex-col bg-background overflow-hidden">
-          <Navigation />
+          {!inRoom && <Navigation />}
           <main className="flex-1 overflow-y-auto min-h-0">
             <Suspense fallback={<div className="flex items-center justify-center h-full text-muted-foreground">Loading...</div>}>
               <Outlet />
