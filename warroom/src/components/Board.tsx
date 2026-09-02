@@ -25,6 +25,7 @@ const ROOM_TOUR = [
   { anchor: 'poll', title: 'DECIDE', body: 'Contested point? Open a poll. One vote per person — enforced by the database, not the buttons.', media: '/tour/poll.webm' },
   { anchor: 'card', title: 'ADD YOUR OWN', body: 'Drop a blank card wherever you\'re looking. Double-click any card to write on it; drag to arrange.' },
   { anchor: 'invite', title: 'GET THE TEAM IN', body: 'That IS the room code — click to copy it. Teammates enter it under JOIN BY LINK (or just open your room URL).' },
+  { anchor: 'members', title: "WHO'S IN THIS ROOM", body: 'Two numbers: ONLINE is who is here right now, MEMBERS is who belongs. Click it for the roster — ★ marks the facilitator, the green dot means online, and you appear as "You".' },
   { anchor: 'summarize', title: 'FILE THE DISPATCH', body: 'When it\'s decided, the AI writes "what was decided" — exportable as Markdown or PDF, with full history.', media: '/tour/summary.webm' },
   { anchor: 'hud', title: 'SELECT TOGETHER', body: 'Hold Shift and drag on empty ground to draw a rectangle over cards — then drag any selected card and the whole group moves with it. Esc or a click on empty ground deselects.', media: '/tour/select.webm', centered: true },
   { anchor: 'hud', title: 'THE CAMERA', body: 'Drag empty ground to pan, pinch to zoom, FIT ALL to frame everything. The download icon exports the whole board.' },
@@ -459,6 +460,7 @@ export default function Board({
             the roster (D-051: star = facilitator, YOU = you, dot = online) */}
         <div className="relative">
           <button
+            data-tour="members"
             onClick={() => setMembersOpen((o) => !o)}
             className="flex items-center gap-1.5 rounded-sm px-1 py-1 hover:bg-accent"
             title="Who's in this room"
