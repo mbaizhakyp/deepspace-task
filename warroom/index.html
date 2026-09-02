@@ -4,7 +4,7 @@
   To switch themes, change `data-theme` to any id defined in src/themes.ts.
   Color values per theme live in src/themes.css.
 -->
-<html lang="en" data-theme="slate">
+<html lang="en" data-theme="day">
   <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
@@ -31,11 +31,12 @@
       html[data-theme="day"] { background-color: #d8d2bf; color-scheme: light; }
       /* Add one line per theme you create, mirroring its --color-background. */
     </style>
-    <!-- Day/night choice applies before first paint (no theme flash) -->
+    <!-- Day is the default edition (user decision, D-052); a stored night
+         choice applies before first paint so there's no theme flash -->
     <script>
       try {
         var t = localStorage.getItem('warroom-theme')
-        if (t === 'day') document.documentElement.dataset.theme = 'day'
+        if (t === 'night') document.documentElement.dataset.theme = 'slate'
       } catch (e) {}
     </script>
   </head>

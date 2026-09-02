@@ -432,3 +432,7 @@ Decisions: the wire log gains a HIDE ▾ control that folds the log smoothly (50
 ## D-051 · Member roster popover; SELECT TOGETHER step centered
 When: user feedback round 16
 Decisions: (a) The "N ONLINE · M MEMBERS" chip is now a button — clicking it opens the roster: every member with their color avatar, a live/offline dot, "You" (highlighted) for yourself, and a ★ on the facilitator. Verified with two live users: You-row and star both present. (b) Tour steps gained an opt-in `centered` flag; only SELECT TOGETHER uses it (its clip made the anchored callout overflow the viewport) — after first centering ALL media steps, the user clarified the others were fine where they were, so the flag is per-step.
+
+## D-052 · Day edition becomes the default theme
+When: post-submission polish (user: "light is more aesthetic")
+Decision: fresh visitors get the day edition; a stored night preference still applies pre-paint (no flash), and the toggle works both ways. Extends the D-027 deviation from the brief's "dark, always" — the night desk remains one click away. Verified on prod: fresh context → day tokens; stored 'night' → slate.
