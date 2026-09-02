@@ -26,6 +26,7 @@ const ROOM_TOUR = [
   { anchor: 'card', title: 'ADD YOUR OWN', body: 'Drop a blank card wherever you\'re looking. Double-click any card to write on it; drag to arrange.' },
   { anchor: 'invite', title: 'GET THE TEAM IN', body: 'That IS the room code — click to copy it. Teammates enter it under JOIN BY LINK (or just open your room URL).' },
   { anchor: 'summarize', title: 'FILE THE DISPATCH', body: 'When it\'s decided, the AI writes "what was decided" — exportable as Markdown or PDF, with full history.', media: '/tour/summary.webm' },
+  { anchor: 'hud', title: 'SELECT TOGETHER', body: 'Hold Shift and drag on empty ground to draw a rectangle over cards — then drag any selected card and the whole group moves with it. Esc or a click on empty ground deselects.' },
   { anchor: 'hud', title: 'THE CAMERA', body: 'Drag empty ground to pan, pinch to zoom, FIT ALL to frame everything. The download icon exports the whole board.' },
 ]
 
@@ -64,16 +65,17 @@ export default function Board({
   summaryAt: number | null
 }) {
   const { user } = useAuthUser()
-  const { records: cards } = useQuery<CardData>('cards', {})
+  const { records: cards, status: cardsStatus } = useQuery<CardData>('cards', {})
   const { records: settingsRecords } = useQuery<SettingsData>('board_settings', {})
   const { records: events } = useQuery<EventData>('events', { orderBy: 'at', orderDir: 'desc', limit: 5 })
-  const { records: polls } = useQuery<PollData>('polls', {})
+  const { records: polls, status: pollsStatus } = useQuery<PollData>('polls', {})
   const { records: allVotes } = useQuery<VoteData>('votes', {})
   const { create, put, remove, ready } = useMutations<CardData>('cards')
   const pollMutations = useMutations<PollData>('polls')
   const voteMutations = useMutations<{ pollId: string; voterId: string; optionIndex: number }>('votes')
   const eventMutations = useMutations<EventData>('events')
   const [pollDialogOpen, setPollDialogOpen] = useState(false)
+  const [logsOpen, setLogsOpen] = useState(true)
   const [panel, setPanel] = useState<'none' | 'import' | 'summary'>('none')
   const importOpen = panel === 'import'
   const { warning } = useToast()
@@ -200,10 +202,35 @@ export default function Board({
     if (p) updateState({ cx: p.wx, cy: p.wy, name: user?.fullName ?? '?' })
   }
 
-  // ── drag (cards and polls share it; kind picks the collection) ──────
-  const [drag, setDrag] = useState<{ id: string; kind: 'card' | 'poll'; dx: number; dy: number; x: number; y: number } | null>(null)
+  // ── drag: group-based (D-049). A drag always moves a GROUP — the marquee
+  // selection when the grabbed item is in it, otherwise just that item. ──
+  type Member = { id: string; kind: 'card' | 'poll'; x0: number; y0: number }
+  const [drag, setDrag] = useState<{ lead: string; dx: number; dy: number; ox: number; oy: number; group: Member[] } | null>(null)
+  const [groupPos, setGroupPos] = useState<Map<string, { x: number; y: number }> | null>(null)
   const [shakeId, setShakeId] = useState<string | null>(null)
   const lastDragSync = useRef(0)
+
+  // ── marquee multi-select (D-049): Shift+drag on empty ground ──
+  const [sel, setSel] = useState<Set<string>>(new Set())
+  const [marquee, setMarquee] = useState<{ x0: number; y0: number; x1: number; y1: number } | null>(null)
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') setSel(new Set())
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [])
+
+  function marqueeHits(m: { x0: number; y0: number; x1: number; y1: number }): Set<string> {
+    const [mx0, mx1] = [Math.min(m.x0, m.x1), Math.max(m.x0, m.x1)]
+    const [my0, my1] = [Math.min(m.y0, m.y1), Math.max(m.y0, m.y1)]
+    const hit = new Set<string>()
+    const overlaps = (x: number, y: number, w: number, h: number) =>
+      x < mx1 && x + w > mx0 && y < my1 && y + h > my0
+    for (const c of cards) if (overlaps(c.data.x, c.data.y, 256, 160)) hit.add(c.recordId)
+    for (const pl of polls) if (overlaps(pl.data.x ?? 400, pl.data.y ?? 200, 320, 260)) hit.add(pl.recordId)
+    return hit
+  }
 
   function startDrag(e: React.PointerEvent, id: string, kind: 'card' | 'poll', x: number, y: number) {
     e.stopPropagation() // grabbing a card must not also pan the board
@@ -215,16 +242,34 @@ export default function Board({
     }
     const p = fieldWorldPoint(e)
     if (!p) return
-    setDrag({ id, kind, dx: p.wx - x, dy: p.wy - y, x, y })
+    // dragging an unselected item drops the old selection (desktop convention)
+    const inSel = sel.has(id)
+    if (!inSel && sel.size > 0) setSel(new Set())
+    const ids = inSel ? sel : new Set([id])
+    const group: Member[] = [
+      ...cards.filter((c) => ids.has(c.recordId)).map((c) => ({ id: c.recordId, kind: 'card' as const, x0: c.data.x, y0: c.data.y })),
+      ...polls.filter((pl) => ids.has(pl.recordId)).map((pl) => ({ id: pl.recordId, kind: 'poll' as const, x0: pl.data.x ?? 400, y0: pl.data.y ?? 200 })),
+    ]
+    setDrag({ lead: id, dx: p.wx - x, dy: p.wy - y, ox: x, oy: y, group })
   }
 
-  function syncDragPosition(id: string, kind: 'card' | 'poll', x: number, y: number) {
-    if (kind === 'card') void put(id, { x, y } as Partial<CardData>)
-    else void pollMutations.put(id, { x, y })
+  function syncMember(m: Member, dX: number, dY: number) {
+    const pos = { x: m.x0 + dX, y: m.y0 + dY }
+    if (m.kind === 'card') void put(m.id, pos as Partial<CardData>)
+    else void pollMutations.put(m.id, pos)
   }
 
   function onDragMove(e: React.PointerEvent) {
     onFieldPointerMove(e)
+    if (marquee) {
+      const p = fieldWorldPoint(e)
+      if (p) {
+        const next = { ...marquee, x1: p.wx, y1: p.wy }
+        setMarquee(next)
+        setSel(marqueeHits(next)) // live highlight while dragging the rectangle
+      }
+      return
+    }
     if (pan.current) {
       const { px, py } = pan.current
       pan.current = { px: e.clientX, py: e.clientY }
@@ -234,36 +279,45 @@ export default function Board({
     if (!drag) return
     const p = fieldWorldPoint(e)
     if (!p) return
-    const x = p.wx - drag.dx
-    const y = p.wy - drag.dy
-    setDrag({ ...drag, x, y })
-    // stream position while dragging so other windows see the card move live
+    const dX = p.wx - drag.dx - drag.ox
+    const dY = p.wy - drag.dy - drag.oy
+    setGroupPos(new Map(drag.group.map((m) => [m.id, { x: m.x0 + dX, y: m.y0 + dY }])))
+    // stream positions while dragging so other windows see the move live
     const now = performance.now()
     if (now - lastDragSync.current > 120) {
       lastDragSync.current = now
-      syncDragPosition(drag.id, drag.kind, x, y)
+      for (const m of drag.group) syncMember(m, dX, dY)
     }
   }
 
-  // Post-drop settle (B-008): after release, the card would render the last
+  // Post-drop settle (B-008): after release, items would render the last
   // SYNCED position (up to 120ms stale) until the final write echoes back —
-  // a one-frame shake. Hold the drop position locally while the echo lands.
-  const [settled, setSettled] = useState<{ id: string; x: number; y: number } | null>(null)
+  // a one-frame shake. Hold the drop positions locally while the echo lands.
+  const [settledMap, setSettledMap] = useState<Map<string, { x: number; y: number }> | null>(null)
 
   function endDrag() {
     pan.current = null
-    if (drag) {
-      syncDragPosition(drag.id, drag.kind, drag.x, drag.y)
-      setSettled({ id: drag.id, x: drag.x, y: drag.y })
-      setTimeout(() => setSettled(null), 800)
+    if (marquee) {
+      setMarquee(null)
+      setDrag(null)
+      return
     }
+    if (drag && groupPos) {
+      const lead = groupPos.get(drag.lead)
+      if (lead) {
+        const dX = lead.x - drag.ox
+        const dY = lead.y - drag.oy
+        for (const m of drag.group) syncMember(m, dX, dY)
+      }
+      setSettledMap(groupPos)
+      setTimeout(() => setSettledMap(null), 800)
+    }
+    setGroupPos(null)
     setDrag(null)
   }
 
   function overridePos(id: string): { x: number; y: number } | null {
-    if (drag?.id === id) return { x: drag.x, y: drag.y }
-    if (settled?.id === id) return { x: settled.x, y: settled.y }
-    return null
+    return groupPos?.get(id) ?? settledMap?.get(id) ?? null
   }
 
   // ── card CRUD ───────────────────────────────────────────────────────
@@ -512,6 +566,12 @@ export default function Board({
         }}
         onPointerDown={(e) => {
           if (e.button !== 0) return
+          if (e.shiftKey) {
+            const p = fieldWorldPoint(e)
+            if (p) setMarquee({ x0: p.wx, y0: p.wy, x1: p.wx, y1: p.wy })
+            return
+          }
+          if (sel.size > 0) setSel(new Set()) // click on empty ground deselects
           pan.current = { px: e.clientX, py: e.clientY }
         }}
         onPointerMove={onDragMove}
@@ -534,6 +594,7 @@ export default function Board({
             id={c.recordId}
             data={c.data}
             dragPos={overridePos(c.recordId)}
+            selected={sel.has(c.recordId)}
             shake={shakeId === c.recordId}
             locked={locked}
             // mirror the server rule (delete: 'own') — showing × on cards the
@@ -550,6 +611,7 @@ export default function Board({
             key={p.recordId}
             pollId={p.recordId}
             data={p.data}
+            selected={sel.has(p.recordId)}
             memberCount={Math.max(memberCount, peers.length + 1)}
             isFacilitator={isFacilitator}
             locked={locked}
@@ -562,6 +624,19 @@ export default function Board({
             }
           />
         ))}
+
+        {/* marquee rectangle — Shift+drag on empty ground */}
+        {marquee && (
+          <div
+            className="pointer-events-none absolute z-40 border border-primary/70 bg-primary/10"
+            style={{
+              left: Math.min(marquee.x0, marquee.x1),
+              top: Math.min(marquee.y0, marquee.y1),
+              width: Math.abs(marquee.x1 - marquee.x0),
+              height: Math.abs(marquee.y1 - marquee.y0),
+            }}
+          />
+        )}
 
         {/* peer cursors */}
         {peers.map((p) => {
@@ -610,8 +685,14 @@ export default function Board({
           </button>
         </div>
 
+        {/* board still syncing: don't claim emptiness before the data is in (B-020) */}
+        {(cardsStatus !== 'ready' || pollsStatus !== 'ready') && cards.length === 0 && polls.length === 0 && (
+          <div className="pointer-events-none absolute inset-0 z-20 flex items-center justify-center">
+            <div className="wire breathe text-chrome">SYNCING THE TABLE</div>
+          </div>
+        )}
         {/* empty table: the journey's first move, made unmissable (D-045) */}
-        {cards.length === 0 && polls.length === 0 && !importOpen && (
+        {cardsStatus === 'ready' && pollsStatus === 'ready' && cards.length === 0 && polls.length === 0 && !importOpen && (
           <div className="pointer-events-none absolute inset-0 z-20 flex flex-col items-center justify-center gap-3">
             <div className="font-serif text-3xl text-foreground/90">An empty table.</div>
             <p className="wire text-chrome">BRING A DOCUMENT — CARDS LAND LIVE FOR EVERYONE</p>
@@ -625,15 +706,27 @@ export default function Board({
           </div>
         )}
 
-        {/* wire log — the meeting writing its own record */}
+        {/* wire log — the meeting writing its own record. Collapsible: the
+            HIDE control rides the top edge and slides down as the log folds;
+            events keep flowing underneath either way. */}
         <div className="pointer-events-none absolute bottom-4 left-5 z-30 flex flex-col gap-1">
-          {[...events].reverse().map((e) => (
-            <div key={e.recordId} className="wire wire-tick text-chrome">
-              <span className="text-live">{formatTime(e.data.at)}</span>
-              {'  '}
-              {e.data.text}
-            </div>
-          ))}
+          <button
+            onClick={() => setLogsOpen((o) => !o)}
+            className="wire pointer-events-auto self-start text-[9px] text-chrome/50 transition-colors hover:text-chrome"
+          >
+            {logsOpen ? 'HIDE ▾' : 'SHOW WIRE ▴'}
+          </button>
+          <div
+            className={`flex flex-col gap-1 overflow-hidden transition-all duration-500 ease-in-out ${logsOpen ? 'max-h-32 opacity-100' : 'max-h-0 opacity-0'}`}
+          >
+            {[...events].reverse().map((e) => (
+              <div key={e.recordId} className="wire wire-tick text-chrome">
+                <span className="text-live">{formatTime(e.data.at)}</span>
+                {'  '}
+                {e.data.text}
+              </div>
+            ))}
+          </div>
         </div>
       </div>
 
@@ -703,6 +796,7 @@ function BoardCard({
   id,
   data,
   dragPos,
+  selected,
   shake,
   locked,
   canDelete,
@@ -713,6 +807,7 @@ function BoardCard({
   id: string
   data: CardData
   dragPos: { x: number; y: number } | null
+  selected: boolean
   shake: boolean
   locked: boolean
   canDelete: boolean
@@ -737,8 +832,10 @@ function BoardCard({
   return (
     <div
       // imported cards land on batch-colored stock (D-042): every import run
-      // is a different paper, so batches read as groups at board distance
-      className={`card-drop absolute w-64 rounded-sm bg-paper p-4 shadow-[0_2px_6px_rgba(26,26,22,.35)] ${shake ? 'locked-shake' : ''} ${dragPos ? 'z-30' : 'z-10'}`}
+      // is a different paper, so batches read as groups at board distance.
+      // The WHOLE card drags (edges included) — grabbing the padding used to
+      // fall through to the board and pan instead (caught in D-049 testing).
+      className={`card-drop absolute w-64 rounded-sm bg-paper p-4 shadow-[0_2px_6px_rgba(26,26,22,.35)] ${locked ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'} ${selected ? 'ring-2 ring-primary/60' : ''} ${shake ? 'locked-shake' : ''} ${dragPos ? 'z-30' : 'z-10'}`}
       style={{
         left: x,
         top: y,
@@ -746,6 +843,7 @@ function BoardCard({
         backgroundColor:
           data.origin === 'imported' ? BATCH_TINTS[(data.tint ?? 0) % BATCH_TINTS.length] : undefined,
       }}
+      onPointerDown={onPointerDown}
       onDoubleClick={() => {
         if (locked) return
         setDraftTitle(data.title)
@@ -753,10 +851,7 @@ function BoardCard({
         setEditing(true)
       }}
     >
-      <div
-        className={locked ? 'cursor-not-allowed' : 'cursor-grab active:cursor-grabbing'}
-        onPointerDown={onPointerDown}
-      >
+      <div>
         {editing ? (
           <div onPointerDown={(e) => e.stopPropagation()}>
             <input
@@ -791,6 +886,7 @@ function BoardCard({
       {canDelete && !editing && (
         <button
           onClick={onDelete}
+          onPointerDown={(e) => e.stopPropagation()}
           className="absolute right-0.5 top-0.5 hidden p-1.5 text-base leading-none text-ink-muted hover:text-ink [div:hover>&]:block"
           aria-label="Delete card"
         >

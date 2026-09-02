@@ -123,7 +123,7 @@ export default function RoomsPage() {
   // already lit when the spotlight lands on it (a dimmed target read as
   // disabled, per user feedback).
   function typeDemoName() {
-    const target = "Q3 launch plan"
+    const target = "Tutorial room"
     setIntent('create')
     setName('')
     let i = 0

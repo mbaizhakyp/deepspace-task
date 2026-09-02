@@ -411,3 +411,20 @@ Fix (client): independent stuck detection — a job queued/running whose OWN age
 ## D-048 · Polls announce when everyone has voted
 When: user feedback round 14
 Decision: when every room member has voted on an open poll, the card signals ripeness: a forest-green ring around the card, the header flips to "EVERYONE VOTED · N/N — READY TO DECIDE", and vote counts everywhere show n/m against the member count (green when complete). Forest green (#15803d) on paper — phosphor fails on cream. Verified with two live users: banner absent at 1/2, appears in BOTH windows at 2/2.
+
+## B-020 · Opening a room with content flashed "An empty table" · FIXED
+When: user report, round 15
+Root cause: the empty-state rendered whenever cards+polls arrays were empty — including the moment before the board queries finished loading. Emptiness was claimed before the data was in.
+Fix: the empty CTA now requires both queries 'ready'; while syncing, a breathing "SYNCING THE TABLE" shows instead.
+
+## B-021 · Dispatch panel: stale summary shown despite changes; "past dispatch" banner on the latest · FIXED
+When: user report, round 15
+Fixes: (a) opening the panel auto-summarizes when the board changed — the B-017 fingerprint makes the unchanged case one cheap round-trip with no AI call, and its "nothing has changed" reply is silenced in auto mode. Verified on prod: board edited → panel opened → new headline with zero clicks. (b) Clicking the NEWEST history row now returns to the current view instead of claiming "viewing a past dispatch".
+
+## D-049 · Marquee multi-select + group drag; whole-card grab surface
+When: user request, round 15 ("select cards in a rectangle and move them collectively like on desktop")
+Decision: Shift+drag on empty ground draws a marquee (live orange highlight as it sweeps); dragging any selected item moves the whole group (drag core rebuilt group-first: every drag is a group of ≥1, streamed at the same 120ms cadence, B-008 settle held per-member). Desktop conventions kept: dragging an unselected item drops the selection; Esc or empty-ground click deselects. Verified on prod: marquee selected 2 cards, dragging one moved both by exactly (+120,+90).
+Also caught in verification: grabbing a card's padding fell through to the board and PANNED — the drag handler moved to the whole card (delete × opts out), so edges grab properly now.
+
+## D-050 · Round-15 polish: wire log HIDE/SHOW, tour additions, tutorial room name
+Decisions: the wire log gains a HIDE ▾ control that folds the log smoothly (500ms max-height/opacity) into a SHOW WIRE ▴ that slides to the bottom edge — events keep flowing underneath; the walkthrough gains a SELECT TOGETHER step and auto-types "Tutorial room" instead of "Q3 launch plan"; the welcome walkthrough remains AUTOMATIC for new users (offered as the centered modal on first lobby visit — the replay link is only for reruns).

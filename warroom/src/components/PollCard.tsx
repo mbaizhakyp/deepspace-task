@@ -38,6 +38,7 @@ export function PollCard({
   isFacilitator,
   locked,
   memberCount,
+  selected,
   canDelete,
   onDelete,
   onPointerDown,
@@ -48,6 +49,7 @@ export function PollCard({
   isFacilitator: boolean
   locked: boolean
   memberCount: number
+  selected: boolean
   canDelete: boolean
   onDelete: () => void
   onPointerDown: (e: React.PointerEvent) => void
@@ -99,7 +101,7 @@ export function PollCard({
 
   return (
     <div
-      className={`card-drop absolute z-10 w-80 rounded-sm bg-paper p-4 shadow-[0_2px_6px_rgba(26,26,22,.35)] ${allVoted ? 'ring-2 ring-[#15803d]/50' : ''} ${dragPos ? 'z-30' : ''}`}
+      className={`card-drop absolute z-10 w-80 rounded-sm bg-paper p-4 shadow-[0_2px_6px_rgba(26,26,22,.35)] ${selected ? 'ring-2 ring-primary/60' : allVoted ? 'ring-2 ring-[#15803d]/50' : ''} ${dragPos ? 'z-30' : ''}`}
       style={{ left: x, top: y }}
     >
       <div

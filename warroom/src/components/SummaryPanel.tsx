@@ -6,7 +6,7 @@
  * kept in the board's `summaries` collection (history view).
  */
 
-import { useState } from 'react'
+import { useEffect, useRef, useState } from 'react'
 import { useAuthUser, useQuery } from 'deepspace'
 import { callAction } from '../lib/actions-client'
 import { parseSummary, type Summary } from '../actions/summarize'
@@ -58,7 +58,7 @@ export function SummaryPanel({
   // these are elapsed-time stages, not fake percentages (D-018)
   const STAGES = ['READING THE BOARD', 'WEIGHING THE POLLS', 'WRITING THE DISPATCH']
 
-  async function run() {
+  async function run(auto = false) {
     setWorking(true)
     setStage(0)
     setError(null)
@@ -68,8 +68,22 @@ export function SummaryPanel({
     const res = await callAction('summarize', { roomId, userName: user?.fullName ?? '' })
     clearInterval(ticker)
     setWorking(false)
-    if (!res.success) setError(res.error ?? 'summary failed')
+    if (!res.success) {
+      // auto-refresh on an unchanged board is the expected quiet case, not an error
+      if (auto && /nothing has changed/i.test(res.error ?? '')) return
+      setError(res.error ?? 'summary failed')
+    }
   }
+
+  // Opening the panel re-summarizes IF the board changed since the last
+  // dispatch (user expectation, round 15). Unchanged boards return in one
+  // cheap round-trip (the B-017 fingerprint check) — no AI call, no error.
+  const autoRan = useRef(false)
+  useEffect(() => {
+    if (autoRan.current || !summary) return
+    autoRan.current = true
+    void run(true)
+  }, [summary]) // run() identity changes per render; autoRan makes this once-only
 
   function downloadMd() {
     if (!shown) return
@@ -209,7 +223,9 @@ export function SummaryPanel({
             <button
               key={h.recordId}
               onClick={() => {
-                setSelectedId(h.recordId)
+                // the newest history row IS the current dispatch — selecting
+                // it must not claim you're "viewing a past dispatch"
+                setSelectedId(h.recordId === history[0]?.recordId ? null : h.recordId)
                 setView('current')
               }}
               className="rounded-sm border border-border px-3 py-2.5 text-left hover:border-chrome"
@@ -253,7 +269,7 @@ export function SummaryPanel({
       <div className="flex-1" />
       <div className="no-print mt-8 flex items-center gap-3 border-t border-border pt-5">
         <button
-          onClick={run}
+          onClick={() => run()}
           disabled={working}
           className="rounded-sm bg-signal px-4 py-2.5 text-[13px] font-semibold text-ink disabled:opacity-50"
         >
