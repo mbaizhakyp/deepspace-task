@@ -428,3 +428,7 @@ Also caught in verification: grabbing a card's padding fell through to the board
 
 ## D-050 · Round-15 polish: wire log HIDE/SHOW, tour additions, tutorial room name
 Decisions: the wire log gains a HIDE ▾ control that folds the log smoothly (500ms max-height/opacity) into a SHOW WIRE ▴ that slides to the bottom edge — events keep flowing underneath; the walkthrough gains a SELECT TOGETHER step and auto-types "Tutorial room" instead of "Q3 launch plan"; the welcome walkthrough remains AUTOMATIC for new users (offered as the centered modal on first lobby visit — the replay link is only for reruns).
+
+## D-051 · Member roster popover; SELECT TOGETHER step centered
+When: user feedback round 16
+Decisions: (a) The "N ONLINE · M MEMBERS" chip is now a button — clicking it opens the roster: every member with their color avatar, a live/offline dot, "You" (highlighted) for yourself, and a ★ on the facilitator. Verified with two live users: You-row and star both present. (b) Tour steps gained an opt-in `centered` flag; only SELECT TOGETHER uses it (its clip made the anchored callout overflow the viewport) — after first centering ALL media steps, the user clarified the others were fine where they were, so the flag is per-step.

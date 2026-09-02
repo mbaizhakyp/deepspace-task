@@ -21,6 +21,8 @@ export type TourStep = {
   onEnter?: () => void
   /** Short looping clip demonstrating the action (public asset path). */
   media?: string
+  /** Place the callout dead-center instead of anchored (for tall steps). */
+  centered?: boolean
 }
 
 const DONE_KEY = 'warroom-tour2'
@@ -105,9 +107,14 @@ export function Tour({ steps, onEnd }: { steps: TourStep[]; onEnd: () => void })
   }, [step.anchor, idx, steps.length, onEnd])
 
   if (!rect) return null
+  // an anchored tall callout can overflow the viewport — steps opt into
+  // dead-center placement individually (user wants only SELECT TOGETHER there)
+  const centered = !!step.centered
   const below = rect.bottom + 200 < window.innerHeight
-  const top = below ? rect.bottom + 12 : Math.max(12, rect.top - 190)
-  const left = Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - 340))
+  const top = centered ? undefined : below ? rect.bottom + 12 : Math.max(12, rect.top - 190)
+  const left = centered
+    ? undefined
+    : Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - 340))
 
   return (
     // pointer-events-none overall: interactive steps NEED the page clickable
@@ -124,8 +131,8 @@ export function Tour({ steps, onEnd }: { steps: TourStep[]; onEnd: () => void })
         }}
       />
       <div
-        className="pointer-events-auto absolute w-80 rounded-sm border border-border bg-card p-4 shadow-[0_8px_30px_rgba(0,0,0,.5)] transition-all duration-300"
-        style={{ top, left }}
+        className={`pointer-events-auto absolute w-80 rounded-sm border border-border bg-card p-4 shadow-[0_8px_30px_rgba(0,0,0,.5)] transition-all duration-300 ${centered ? 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}
+        style={centered ? undefined : { top, left }}
       >
         <div className="wire text-[10px] text-primary">
           {idx + 1} / {steps.length} · {step.title}

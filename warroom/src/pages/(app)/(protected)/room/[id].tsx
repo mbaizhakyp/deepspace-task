@@ -87,7 +87,7 @@ export default function RoomPage() {
         roomId={id}
         roomName={room.data.name}
         roomCode={room.data.code ?? null}
-        memberCount={parseMemberIds(room.data.memberIds).length}
+        memberIds={parseMemberIds(room.data.memberIds)}
         facilitatorId={room.data.facilitatorId}
         summary={parseSummary(room.data.summary)}
         summaryAt={room.data.summaryAt ?? null}

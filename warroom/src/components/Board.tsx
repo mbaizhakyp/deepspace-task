@@ -7,7 +7,7 @@
 
 import { useEffect, useRef, useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { getUserColor, useAuthUser, useJobs, useMutations, usePresenceRoom, useQuery } from 'deepspace'
+import { getUserColor, useAuthUser, useJobs, useMutations, usePresenceRoom, useQuery, useUsers } from 'deepspace'
 import { Textarea, useToast } from '@/components/ui'
 import { callAction } from '../lib/actions-client'
 import { fitView, gridSpacing, toWorld, zoomView, type View } from '../lib/camera'
@@ -26,7 +26,7 @@ const ROOM_TOUR = [
   { anchor: 'card', title: 'ADD YOUR OWN', body: 'Drop a blank card wherever you\'re looking. Double-click any card to write on it; drag to arrange.' },
   { anchor: 'invite', title: 'GET THE TEAM IN', body: 'That IS the room code — click to copy it. Teammates enter it under JOIN BY LINK (or just open your room URL).' },
   { anchor: 'summarize', title: 'FILE THE DISPATCH', body: 'When it\'s decided, the AI writes "what was decided" — exportable as Markdown or PDF, with full history.', media: '/tour/summary.webm' },
-  { anchor: 'hud', title: 'SELECT TOGETHER', body: 'Hold Shift and drag on empty ground to draw a rectangle over cards — then drag any selected card and the whole group moves with it. Esc or a click on empty ground deselects.', media: '/tour/select.webm' },
+  { anchor: 'hud', title: 'SELECT TOGETHER', body: 'Hold Shift and drag on empty ground to draw a rectangle over cards — then drag any selected card and the whole group moves with it. Esc or a click on empty ground deselects.', media: '/tour/select.webm', centered: true },
   { anchor: 'hud', title: 'THE CAMERA', body: 'Drag empty ground to pan, pinch to zoom, FIT ALL to frame everything. The download icon exports the whole board.' },
 ]
 
@@ -51,7 +51,7 @@ export default function Board({
   roomId,
   roomName,
   roomCode,
-  memberCount,
+  memberIds,
   facilitatorId,
   summary,
   summaryAt,
@@ -59,7 +59,7 @@ export default function Board({
   roomId: string
   roomName: string
   roomCode: string | null
-  memberCount: number
+  memberIds: string[]
   facilitatorId: string
   summary: Summary | null
   summaryAt: number | null
@@ -92,6 +92,11 @@ export default function Board({
   const peers = rawPeers.filter(
     (p, i) => p.userId !== user?.id && rawPeers.findIndex((q) => q.userId === p.userId) === i,
   )
+  const memberCount = Math.max(memberIds.length, peers.length + 1)
+  // roster (public identity) for the member list popover (D-051)
+  const { users: roster } = useUsers()
+  const [membersOpen, setMembersOpen] = useState(false)
+  const onlineIds = new Set([user?.id ?? '', ...peers.map((p) => p.userId)])
   const fieldRef = useRef<HTMLDivElement>(null)
   const lastCursorSent = useRef(0)
 
@@ -450,13 +455,48 @@ export default function Board({
             </div>
           ))}
         </div>
-        {/* who's HERE vs who's IN — different facts, both shown */}
-        <div className="flex items-center gap-1.5">
-          <span className="h-1.5 w-1.5 rounded-full bg-live breathe" />
-          <span className="wire text-chrome">
-            {peers.length + 1} ONLINE
-            <span className="text-chrome/60"> · {Math.max(memberCount, peers.length + 1)} MEMBERS</span>
-          </span>
+        {/* who's HERE vs who's IN — different facts, both shown; click for
+            the roster (D-051: star = facilitator, YOU = you, dot = online) */}
+        <div className="relative">
+          <button
+            onClick={() => setMembersOpen((o) => !o)}
+            className="flex items-center gap-1.5 rounded-sm px-1 py-1 hover:bg-accent"
+            title="Who's in this room"
+          >
+            <span className="h-1.5 w-1.5 rounded-full bg-live breathe" />
+            <span className="wire text-chrome">
+              {peers.length + 1} ONLINE
+              <span className="text-chrome/60"> · {memberCount} MEMBERS</span>
+            </span>
+          </button>
+          {membersOpen && (
+            <div className="absolute left-0 top-10 z-[70] flex w-60 flex-col rounded-sm border border-border bg-popover p-1.5 shadow-[0_8px_24px_rgba(0,0,0,.45)]">
+              {memberIds.map((id) => {
+                const isMe = id === user?.id
+                const name = isMe ? 'You' : (roster.find((u) => u.id === id)?.name ?? 'someone')
+                return (
+                  <div key={id} className="flex items-center gap-2 rounded-[2px] px-2 py-1.5">
+                    <span
+                      className={`h-1.5 w-1.5 flex-none rounded-full ${onlineIds.has(id) ? 'bg-live' : 'bg-border'}`}
+                      title={onlineIds.has(id) ? 'Online' : 'Offline'}
+                    />
+                    <span
+                      className="h-4 w-4 flex-none rounded-full text-center text-[9px] font-semibold leading-4 text-background"
+                      style={{ backgroundColor: getUserColor(id) }}
+                    >
+                      {name.charAt(0).toUpperCase()}
+                    </span>
+                    <span className={`truncate text-[13px] ${isMe ? 'font-semibold text-primary' : 'text-foreground'}`}>
+                      {name}
+                    </span>
+                    {id === facilitatorId && (
+                      <span className="ml-auto text-signal" title="Facilitator">★</span>
+                    )}
+                  </div>
+                )
+              })}
+            </div>
+          )}
         </div>
         {/* room controls | board actions — glyphs differentiate at a glance
             without breaking the wire voice (no emoji in chrome) */}
@@ -612,7 +652,7 @@ export default function Board({
             pollId={p.recordId}
             data={p.data}
             selected={sel.has(p.recordId)}
-            memberCount={Math.max(memberCount, peers.length + 1)}
+            memberCount={memberCount}
             isFacilitator={isFacilitator}
             locked={locked}
             // mirrors the server rule (pollDeleteDenial: creator or facilitator)
