@@ -3,54 +3,53 @@
 **Live:** https://warroomhq.app.space
 **Repo:** github.com/mbaizhakyp/deepspace-task (app in `warroom/`; process docs in `docs/`)
 
-Sixty-second demo: sign in → open a room → IMPORT → paste any text (messy notes work best) → watch cards land → open a poll → Summarize. Two browser windows on the same room link is the full effect.
+Sixty-second demo: sign in → take the built-in 30-second walkthrough (it has you create a room and shows every control with recorded demo clips) → IMPORT (browse your Google Docs, or paste messy notes) → watch cards land and the camera center on them → open a poll → Summarize. Two browser windows on the same room code is the full effect.
 
 ## What it is
 
-A war room, not a call. Import a document — tidy or messy — and it lands on a shared board as live cards. The team triages together (presence cursors, realtime drag, an unlimited pannable/zoomable board each person frames for themselves), contested points get settled by live polls (one vote per person, enforced by the database), the facilitator can freeze the whole room server-side, and the meeting ends with an AI-written dispatch ("What was decided") exported as Markdown. The meeting is the artifact.
+A war room, not a call. Import documents — from your Google Drive or pasted, tidy or messy — and they land on a shared board as live cards, each import batch on its own paper stock. The team triages together (presence cursors, realtime drag, marquee multi-select with group moves, an unlimited pannable/zoomable board each person frames for themselves), contested points get settled by live polls (one vote per person, enforced by the database; the card turns green when everyone has voted), the facilitator can freeze the whole room server-side, and the meeting ends with an AI-written dispatch ("What was decided") — with full dispatch history, exportable as Markdown or PDF. Rooms are joined by link or by a short WR- code. The meeting is the artifact.
 
-Best demo: open the room in two browser windows as two users. Vote in one, watch the bar move in the other; freeze in one, watch the other lock.
-
-## Platform capabilities used (7)
+## Platform capabilities used (8)
 
 1. **Auth** — gated app; static landing, everything else behind sign-in.
-2. **Realtime records** — cards, polls, votes, settings, wire-log events; per-board Durable Object rooms (`board:<id>`), app scope holds the registry.
+2. **Realtime records** — cards, polls, votes, settings, summaries, wire-log events; per-board Durable Object rooms (`board:<id>`), app scope holds the registry.
 3. **Permissions, actually gating** — three layers, each with an adversarial proof, not just a disabled button:
-   - collection RBAC: votes are unforgeable (server-stamped `userBound` voterId, `uniqueOn` one-per-poll at the DB, revote = `update: 'own'`); card deletion is `'own'` and the UI mirrors it;
+   - collection RBAC: votes are unforgeable (server-stamped `userBound` voterId, `uniqueOn` one-per-poll at the DB, revote = `update: 'own'`);
    - a membership gate at the WebSocket route — non-members get 403 before reaching a board's DO (records, presence, AND job-progress streams);
-   - time-varying rules RBAC can't express live in the DO's message boundary: facilitator **freeze**, votes on **decided polls** rejected, and poll lifecycle (creator/facilitator close; **only the facilitator reopens** — decided means decided).
-   The two-user Playwright spec attacks all of it: it pushes raw mutations through a frozen user's live socket, fires late votes and forged reopens at a decided poll, and asserts the server bounces each one — then proves the same writes land when legitimate. Access model, stated plainly: rooms are **shareable-link** scoped (any signed-in user with the URL joins, like a link-shared doc); the gates above are about what members can DO, not about hiding the link.
-4. **Presence** — live named cursors + roster.
-5. **Background jobs** — imports run in the platform JobRoom; progress streams to every room member over WS while cards land one by one.
-6. **AI integration** — segmentation (by idea, not headings — messy docs work) and the summary dispatch, via the platform's Anthropic integration; developer-billed, rate-limited.
-7. **Payments** — Pro plan synced to Stripe; free tier = 3 imports/room enforced server-side (a forged client enqueue still hits the quota in the job handler). Checkout is fully live: Stripe Connect onboarding is complete and "Go Pro" reaches checkout.stripe.com (verified against prod).
-
-Plus **Composio per-user OAuth** for Google Docs import (paste a doc URL, approve access, import as yourself) — code-complete with the `requiresConnection` dance; the live OAuth round-trip is the one path not yet verified end-to-end (needs a real Google consent).
+   - time-varying rules RBAC can't express live in the DO's message boundary: facilitator **freeze**, votes on **decided polls** rejected, poll lifecycle (only the facilitator reopens a decided poll), poll deletion (creator or facilitator).
+   The two-user Playwright spec attacks all of it: raw mutations through a frozen user's live socket, late votes and forged reopens at a decided poll — asserting the server bounces each one, then that the same writes land when legitimate. Access model, stated plainly: rooms are **shareable-link/code** scoped (any signed-in user who has either joins, like a link-shared doc); the gates are about what members can DO.
+4. **Presence** — live named cursors, roster popover (facilitator starred, online dots), online-vs-member counts.
+5. **Background jobs** — imports run in the platform JobRoom; progress streams to every member; multi-document runs queue one job per doc and report `x + y + z = total`; a hung job is failed by a server-side timeout AND the panel has independent stuck-detection.
+6. **AI integration** — segmentation (by idea, not headings — messy docs work) and the summary dispatch via the platform's Anthropic integration; developer-billed; re-summarize is gated on a board *fingerprint* (unchanged board = no AI call), not a timer.
+7. **Composio per-user OAuth** — Google Docs import as yourself: browse-and-multi-select your own docs (tool slugs verified against prod via a built-in discovery mode, response shapes learned from data after a live failure — B-002, user-confirmed fixed). Live-verified end to end with a real Google consent.
+8. **Payments** — Pro plan synced to Stripe, monthly and yearly prices, live checkout (verified reaching checkout.stripe.com); free tier = 3 rooms + 3 imports/room, both enforced server-side (a forged client enqueue still hits the quota in the job handler).
 
 ## The main tradeoff
 
-**No video/audio, on purpose.** LiveKit was available, but it's metered billing, miserable to verify, and it would make the app compete with Zoom on Zoom's terms. Presence + live cursors carry the "we're together" feeling; the product competes with the follow-up email nobody writes, not with the call. The freed hours went into making enforcement real (see B-004 below) instead of making a call work.
+**No video/audio, on purpose.** LiveKit was available, but it's metered billing, miserable to verify, and it would make the app compete with Zoom on Zoom's terms. Presence + live cursors carry the "we're together" feeling; the product competes with the follow-up email nobody writes, not with the call. The freed hours went into making enforcement real (B-004 below) instead of making a call work.
 
 A second deliberate cut: no Yjs collaborative text editor — card-level editing is already collaborative via record sync; a document editor is a product of its own.
 
 ## What the agent did vs. what was verified
 
-The agent (Claude Code) researched the SDK from its installed types and docs, planned in stages (`docs/PLAN.md`), wrote effectively all code, and kept a decision/bug ledger (`docs/BUGLOG.md`, D-001…D-014, B-001…B-004). Every stage is one commit.
+The agent (Claude Code) researched the SDK from its installed types and docs, planned in stages (`docs/PLAN.md`), wrote effectively all code, and kept a decision/bug ledger at the moment things happened, not retroactively: `docs/BUGLOG.md` (**B-001…B-021, D-001…D-051**) with a curated architecture record in `docs/DECISIONS.md`. Every stage/fix is its own commit. After the initial build, the product went through ~17 rounds of my live testing and outside feedback; every reported symptom was root-caused, logged, fixed, and re-verified against production (screenshots in `docs/screenshots/`).
 
-Verification was deliberate and adversarial, and it caught real bugs the demo never would:
+Verification was deliberate and adversarial, and it kept catching bugs the demo never would:
 
-- **B-003:** every server action silently failed on first live run — `getAuthToken()` returns a Promise and was used synchronously (`Bearer [object Promise]`). Caught by the first E2E run, not by the type checker.
-- **B-004, the important one:** the freeze looked perfect in the UI but was **not server-enforced** — the DO decided "am I a board?" from its first fetch URL, and a new board's first fetch is an internal action call, so enforcement never armed. Caught only because the test spec deliberately pushes a raw mutation through the frozen user's live socket, past the disabled buttons. Fixed by deriving board-ness from the room's own data.
-- **B-002:** Google Docs import failed live with "document came back empty"; a shape-reporting error message turned one user retry into a one-line fix (the doc resource arrives at the top level of the integration result, not under `.data`).
-- **B-005:** a reported "duplicated room" was investigated with three failed reproduction attempts, then proven to be two legitimately same-named rooms with zero lobby disambiguation — a UI defect, fixed with facilitator + date labels.
-- **B-006:** an external review pass flagged that decided polls were quietly mutable server-side (late votes, member reopens). Fixed with two more message-boundary guards; the regression spec's first run then forced a real product decision (may a creator reopen their own decided poll? No — decided means decided).
+- **B-004, the important one:** the freeze looked perfect in the UI but was **not server-enforced** — the DO decided "am I a board?" from its first fetch URL, which for a new board is an internal action call, so enforcement never armed. Caught only because the spec pushes a raw mutation through the frozen user's live socket, past the disabled buttons.
+- **B-003:** every server action silently failed on first live run — `getAuthToken()` used synchronously sent `Bearer [object Promise]`. Caught by E2E, invisible to the type checker.
+- **B-002:** Google Docs import failed live; a shape-reporting error message (keys only, never content) turned one user retry into a one-line fix, and grew into a discovery-first rule: never trust a guessed API shape.
+- **B-015:** after leaving a room, its row lingered — leaving revokes your read access, so the server *can't* push the membership update to you. Scoped-subscription staleness, found by a focused two-user test, invisible to happy paths.
+- **B-017:** re-summarize was refused after a changed vote — the AI-cost guard measured *time* when it should measure *sameness*; replaced with a board fingerprint.
+- **B-019:** an import stuck at "READING & SEGMENTING" forever — the AI call had no timeout, so a hang left a zombie `running` job. Fixed server-side (deadline → honest failure) and client-side (independent stuck-detection), because one layer of defense had already proven insufficient.
 
-Full history: `docs/BUGLOG.md` (B-001…B-006, D-001…D-016). Final state: 10 unit tests + 11 Playwright tests green, plus a scripted end-to-end run against production (sign-in → room → real AI import of 9 cards → poll → vote → summary) with screenshots in `docs/screenshots/`.
+Final state: **21 unit tests + 11 Playwright tests green**, plus scripted production runs for every shipped round (real AI imports, two-user vote/freeze/join-by-code flows, checkout probes stopping at checkout.stripe.com).
 
-**Hours, honestly:** ~9h total across two days — ~1h research/planning, ~3h building all stages compile-only (blocked on an app-quota decision), ~1.5h runtime verification and the B-003/B-004 fixes, ~1h deploy + production E2E + demo seed, ~2.5h post-ship fixes driven by real usage (audit logging, room deletion, B-002/B-005/B-006). Cut when the box pressed: Yjs minutes pane, export-back-to-Docs, AI chat panel, per-account import metering.
+**Hours, honestly:** ~9h for the initial build across two days (research → staged build → adversarial verification → deploy), then roughly another ~8h of feedback-driven iteration over the following days — features (camera, room codes, walkthrough with recorded demo clips, day/night editions, dispatch history, marquee select) and the bug hunts above. Cut when the box pressed: Yjs minutes pane, export-back-to-Docs, AI chat panel.
 
 ## Honest edges / what I'd do next
 
-- **Google Docs OAuth**: implemented, not live-verified (Composio tool slugs flagged for runtime check, B-002). Next session: one consent click + slug verification.
-- Next features, in order: source-panel "highlight → extract to card" for messy docs; export the dispatch back to a new Google Doc over the same Composio connection; AI chat grounded in the imported doc.
-- Known ceilings are marked with `ponytail:` comments in code (e.g., per-mutation freeze SQL read; per-room rather than per-user import quota).
+- The poll-delete guard's deny path (a member who is neither creator nor facilitator) mirrors the adversarially-tested lifecycle guard but isn't itself raw-tested — it needs a third test account; noted, not faked.
+- The day theme deviates from the design brief's "dark, always" — a deliberate user-override, logged (D-027).
+- Next features, in order: export the dispatch back to a new Google Doc over the same Composio connection; source-panel "highlight → extract to card" for messy docs; AI chat grounded in the imported doc.
+- Known ceilings are marked with `ponytail:` comments in code (e.g., per-mutation freeze SQL read; linear room-code scan).
