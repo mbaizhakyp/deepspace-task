@@ -26,7 +26,7 @@ const ROOM_TOUR = [
   { anchor: 'card', title: 'ADD YOUR OWN', body: 'Drop a blank card wherever you\'re looking. Double-click any card to write on it; drag to arrange.' },
   { anchor: 'invite', title: 'GET THE TEAM IN', body: 'That IS the room code — click to copy it. Teammates enter it under JOIN BY LINK (or just open your room URL).' },
   { anchor: 'summarize', title: 'FILE THE DISPATCH', body: 'When it\'s decided, the AI writes "what was decided" — exportable as Markdown or PDF, with full history.', media: '/tour/summary.webm' },
-  { anchor: 'hud', title: 'SELECT TOGETHER', body: 'Hold Shift and drag on empty ground to draw a rectangle over cards — then drag any selected card and the whole group moves with it. Esc or a click on empty ground deselects.' },
+  { anchor: 'hud', title: 'SELECT TOGETHER', body: 'Hold Shift and drag on empty ground to draw a rectangle over cards — then drag any selected card and the whole group moves with it. Esc or a click on empty ground deselects.', media: '/tour/select.webm' },
   { anchor: 'hud', title: 'THE CAMERA', body: 'Drag empty ground to pan, pinch to zoom, FIT ALL to frame everything. The download icon exports the whole board.' },
 ]
 
