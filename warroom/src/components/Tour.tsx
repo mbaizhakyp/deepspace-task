@@ -168,7 +168,7 @@ export function Tour({ steps, onEnd }: { steps: TourStep[]; onEnd: () => void })
           ) : (
             <button
               onClick={() => (idx < steps.length - 1 ? setIdx(idx + 1) : onEnd())}
-              className="pulse-scale rounded-sm bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground"
+              className="pulse-cta rounded-sm bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground"
             >
               {idx < steps.length - 1 ? 'Next' : 'Done'}
             </button>
