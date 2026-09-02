@@ -27,8 +27,8 @@ const ROOM_TOUR = [
   { anchor: 'invite', title: 'GET THE TEAM IN', body: 'That IS the room code — click to copy it. Teammates enter it under JOIN BY LINK (or just open your room URL).' },
   { anchor: 'members', title: "WHO'S IN THIS ROOM", body: 'Two numbers: ONLINE is who is here right now, MEMBERS is who belongs. Click it for the roster — ★ marks the facilitator, the green dot means online, and you appear as "You".' },
   { anchor: 'summarize', title: 'FILE THE DISPATCH', body: 'When it\'s decided, the AI writes "what was decided" — exportable as Markdown or PDF, with full history.', media: '/tour/summary.webm' },
-  { anchor: 'hud', title: 'SELECT TOGETHER', body: 'Hold Shift and drag on empty ground to draw a rectangle over cards — then drag any selected card and the whole group moves with it. Esc or a click on empty ground deselects.', media: '/tour/select.webm', centered: true },
   { anchor: 'hud', title: 'THE CAMERA', body: 'Drag empty ground to pan, pinch to zoom, FIT ALL to frame everything. The download icon exports the whole board.' },
+  { title: 'SELECT TOGETHER', body: 'Hold Shift and drag on empty ground to draw a rectangle over cards — then drag any selected card and the whole group moves with it. Esc or a click on empty ground deselects.', media: '/tour/select.webm' },
 ]
 
 export type CardData = {

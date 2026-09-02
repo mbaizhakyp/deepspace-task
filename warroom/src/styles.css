@@ -337,6 +337,23 @@
   border-color: var(--color-chrome);
 }
 
+/* Tour affordances (round 17): the spotlight heartbeats on interactive
+   steps ("click this"), and Next buttons pulse gently — the eye finds the
+   action without reading. */
+@keyframes tour-heartbeat {
+  0%, 100% { outline-offset: 0px; outline-color: rgba(232, 100, 27, 0.9); }
+  50% { outline-offset: 7px; outline-color: rgba(232, 100, 27, 0.25); }
+}
+.tour-heartbeat {
+  outline: 2px solid rgba(232, 100, 27, 0.9);
+  animation: tour-heartbeat 1.1s ease-in-out infinite;
+}
+@keyframes pulse-scale {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.06); }
+}
+.pulse-scale { animation: pulse-scale 1.4s ease-in-out infinite; }
+
 /* Honest "working" bar for stages with no measurable progress */
 @keyframes indeterminate-slide {
   from { transform: translateX(-110%); }

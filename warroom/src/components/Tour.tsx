@@ -12,7 +12,8 @@
 import { useEffect, useState } from 'react'
 
 export type TourStep = {
-  anchor: string
+  /** Element to spotlight; omit for a free-floating step (no highlight). */
+  anchor?: string
   title: string
   body: string
   /** Interactive step: no Next button — polls until the user's action makes this true. */
@@ -79,6 +80,7 @@ export function Tour({ steps, onEnd }: { steps: TourStep[]; onEnd: () => void })
 
   useEffect(() => {
     const measure = () => {
+      if (!step.anchor) return setRect(null)
       const el = document.querySelector(`[data-tour="${step.anchor}"]`)
       setRect(el ? el.getBoundingClientRect() : null)
     }
@@ -98,38 +100,44 @@ export function Tour({ steps, onEnd }: { steps: TourStep[]; onEnd: () => void })
     }
   }, [step, idx, steps.length, onEnd])
 
-  // a missing anchor (e.g. facilitator-only button) skips forward
+  // a missing ANCHORED element (e.g. facilitator-only button) skips forward;
+  // anchor-less steps render free-floating and never skip
   useEffect(() => {
-    if (!document.querySelector(`[data-tour="${step.anchor}"]`)) {
+    if (step.anchor && !document.querySelector(`[data-tour="${step.anchor}"]`)) {
       if (idx < steps.length - 1) setIdx(idx + 1)
       else onEnd()
     }
   }, [step.anchor, idx, steps.length, onEnd])
 
-  if (!rect) return null
+  if (step.anchor && !rect) return null
   // an anchored tall callout can overflow the viewport — steps opt into
-  // dead-center placement individually (user wants only SELECT TOGETHER there)
-  const centered = !!step.centered
-  const below = rect.bottom + 200 < window.innerHeight
-  const top = centered ? undefined : below ? rect.bottom + 12 : Math.max(12, rect.top - 190)
-  const left = centered
-    ? undefined
-    : Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - 340))
+  // dead-center placement individually; anchor-less steps always center
+  const centered = !!step.centered || !step.anchor
+  const below = rect ? rect.bottom + 200 < window.innerHeight : true
+  const top = centered || !rect ? undefined : below ? rect.bottom + 12 : Math.max(12, rect.top - 190)
+  const left =
+    centered || !rect
+      ? undefined
+      : Math.min(Math.max(12, rect.left), Math.max(12, window.innerWidth - 340))
 
   return (
     // pointer-events-none overall: interactive steps NEED the page clickable
     <div className="pointer-events-none fixed inset-0 z-[90]">
-      <div
-        className="absolute rounded-sm transition-all duration-300"
-        style={{
-          left: rect.left - 6,
-          top: rect.top - 6,
-          width: rect.width + 12,
-          height: rect.height + 12,
-          boxShadow: '0 0 0 9999px rgba(10, 12, 10, 0.72)',
-          border: '1px solid var(--color-primary)',
-        }}
-      />
+      {rect ? (
+        <div
+          className={`absolute rounded-sm transition-all duration-300 ${step.advanceWhen ? 'tour-heartbeat' : ''}`}
+          style={{
+            left: rect.left - 6,
+            top: rect.top - 6,
+            width: rect.width + 12,
+            height: rect.height + 12,
+            boxShadow: '0 0 0 9999px rgba(10, 12, 10, 0.72)',
+            border: '1px solid var(--color-primary)',
+          }}
+        />
+      ) : (
+        <div className="absolute inset-0 bg-[rgba(10,12,10,0.72)]" />
+      )}
       <div
         className={`pointer-events-auto absolute w-80 rounded-sm border border-border bg-card p-4 shadow-[0_8px_30px_rgba(0,0,0,.5)] transition-all duration-300 ${centered ? 'left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2' : ''}`}
         style={centered ? undefined : { top, left }}
@@ -160,7 +168,7 @@ export function Tour({ steps, onEnd }: { steps: TourStep[]; onEnd: () => void })
           ) : (
             <button
               onClick={() => (idx < steps.length - 1 ? setIdx(idx + 1) : onEnd())}
-              className="rounded-sm bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground"
+              className="pulse-scale rounded-sm bg-primary px-3.5 py-2 text-[13px] font-semibold text-primary-foreground"
             >
               {idx < steps.length - 1 ? 'Next' : 'Done'}
             </button>
